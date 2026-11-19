@@ -1,0 +1,2 @@
+# Python lint only; application/test execution uses the standard library.
+ruff==0.16.10

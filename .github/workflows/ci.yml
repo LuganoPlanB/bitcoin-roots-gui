@@ -1,0 +1,79 @@
+name: Standalone GUI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: standalone-gui-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint-and-project-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Lint and exercise standalone project contracts
+        run: |
+          set -Eeuo pipefail
+          python3 -m venv "$RUNNER_TEMP/gui-lint-tools"
+          "$RUNNER_TEMP/gui-lint-tools/bin/python" -m pip install -r requirements-dev.txt
+          "$RUNNER_TEMP/gui-lint-tools/bin/ruff" check .
+          python3 -m unittest discover -s tests/project
+          python3 tests/support/test_runtime.py
+
+  build-models-and-install:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install native build prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --no-install-recommends -y ninja-build git pkg-config python3 libssl-dev libsodium-dev libgl1-mesa-dev libx11-dev libxext-dev libxrender-dev libxcb1-dev libglib2.0-dev
+      - name: Restore compiler cache
+        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+        with:
+          install: binary
+          key: ${{ runner.os }}-${{ runner.arch }}-roots-gui
+          max-size: 200M
+      - name: Build, run models and verify installation
+        env:
+          BUILD_DIR: ${{ runner.temp }}/roots-gui-build
+          STAGE_DIR: ${{ runner.temp }}/roots-gui-stage
+        run: |
+          set -Eeuo pipefail
+          cmake -S . -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=Release -DROOTS_GUI_BUILD_TESTS=ON 2>&1 | tee "$RUNNER_TEMP/gui-configure.log"
+          cmake --build "$BUILD_DIR" --target roots-gui roots_gui_model_tests -j 2 2>&1 | tee "$RUNNER_TEMP/gui-models.log"
+          cmake --install "$BUILD_DIR" --prefix "$STAGE_DIR" 2>&1 | tee "$RUNNER_TEMP/gui-install.log"
+          "$STAGE_DIR/bin/roots-gui" --version
+          "$STAGE_DIR/bin/roots-gui" --build-contract
+          test -f "$STAGE_DIR/bin/roots-gui-assets/fonts/Inter-Regular.ttf"
+          test -f "$STAGE_DIR/share/doc/roots-gui/licenses/libwally.txt"
+      - name: Retain model results and build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: standalone-gui-results
+          path: |
+            ${{ runner.temp }}/gui-configure.log
+            ${{ runner.temp }}/gui-models.log
+            ${{ runner.temp }}/gui-install.log
+            ${{ runner.temp }}/roots-gui-build/tests/runs/
+          if-no-files-found: warn

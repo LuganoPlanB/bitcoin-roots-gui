@@ -1,0 +1,14 @@
+# CMake builds and dependency staging belong outside this repository.
+/build*/
+/cmake-build*/
+/CMakeFiles/
+/CMakeCache.txt
+/Testing/
+/compile_commands.json
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.venv/
+*.core
+core
+core.[0-9]*

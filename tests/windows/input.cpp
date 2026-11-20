@@ -7,6 +7,7 @@
 #include <GLFW/glfw3native.h>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <stdexcept>
 #include <thread>
@@ -53,6 +54,7 @@ struct Probe : platform::NativeObserver {
             for (std::size_t at = 4; at + 3 < frame.rgba.size(); at += 4)
                 different += frame.rgba[at] != frame.rgba[0] || frame.rgba[at+1] != frame.rgba[1] || frame.rgba[at+2] != frame.rgba[2];
             Check(frame.decorated && frame.font_texture && different > 100, "Win32 OpenGL draws visible content");
+            Check(frame.draw.font_size == std::round(16.F * frame.effective_scale), "Windows display scale applies once to the 16 px body font");
             constexpr std::string_view text = "Roots \xCE\x94 clipboard";
             input.BeginFrame();
             Check(input.Copy(text) && input.RequestInspection(11), "Windows Unicode clipboard write and read");

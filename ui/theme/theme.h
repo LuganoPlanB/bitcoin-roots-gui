@@ -3,6 +3,7 @@
 #pragma once
 #include <imkit/components.h>
 namespace roots::gui::ui::theme {
+inline constexpr float BodyFontSize = 16.F;
 imkit::Theme Make(bool dark, float scale = 1);
 void Apply(const imkit::Theme&);
 // Retains ImKit input/IDs/results; replaces its fixed-offset focus decoration

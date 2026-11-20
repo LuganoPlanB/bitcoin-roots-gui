@@ -219,10 +219,10 @@ void DrawGeneralPreferences(State& s,app::Requests& host,Facts& facts,const imki
     const auto resize = [&facts](int next) { facts.interface_size_requested = next; return true; };
     button("interface-size-decrease", "Decrease size", can_resize && percent > theme::MIN_INTERFACE_SIZE,
         [resize, percent] { return resize(std::max(theme::MIN_INTERFACE_SIZE, percent - 25)); });
-    ImGui::SameLine();
+    theme::SameLineForAction("Increase size");
     button("interface-size-increase", "Increase size", can_resize && percent < theme::MAX_INTERFACE_SIZE,
         [resize, percent] { return resize(std::min(theme::MAX_INTERFACE_SIZE, percent + 25)); });
-    ImGui::SameLine();
+    theme::SameLineForAction("Reset size");
     button("interface-size-reset", "Reset size", can_resize &&
         (percent != theme::DEFAULT_INTERFACE_SIZE || appearance.interface_size_invalid || appearance.interface_size_save_failed),
         [resize] { return resize(theme::DEFAULT_INTERFACE_SIZE); });

@@ -78,9 +78,27 @@ struct NativeInput::Impl:std::enable_shared_from_this<Impl> {
         if(schema){if(g_settings_schema_has_key(schema,"enable-animations")){Context push(context);settings=g_settings_new_full(schema,nullptr,nullptr);status.reduced_motion=!g_settings_get_boolean(settings,"enable-animations");setting_signal=g_signal_connect(settings,"changed::enable-animations",G_CALLBACK(SettingsChanged),this);}g_settings_schema_unref(schema);}
     }
     static void SettingsChanged(GSettings* settings,const gchar*,void* data){auto& self=*static_cast<Impl*>(data);self.Owner();if(!self.closing)self.status.reduced_motion=!g_settings_get_boolean(settings,"enable-animations");}
-    void ReadScale(){auto* reply=xcb_get_property_reply(display,xcb_get_property(display,false,root,resource,XCB_ATOM_STRING,0,8192),nullptr);if(!reply)return;
-        status.system_scale=1.F;
-        if(reply->format==8 && !reply->bytes_after){std::string text(static_cast<const char*>(xcb_get_property_value(reply)),xcb_get_property_value_length(reply));auto db=XrmGetStringDatabase(text.c_str());if(db){XrmValue value{};char* kind{};if(XrmGetResource(db,"Xft.dpi","Xft.Dpi",&kind,&value) && value.addr){const auto dpi=g_ascii_strtod(value.addr,nullptr);if(std::isfinite(dpi) && dpi>=48 && dpi<=768)status.system_scale=float(std::clamp(dpi/96.0,.5,8.0));}XrmDestroyDatabase(db);}}std::free(reply);
+    void ReadScale()
+    {
+        status.system_scale.reset();
+        auto* reply = xcb_get_property_reply(display,
+            xcb_get_property(display, false, root, resource, XCB_ATOM_STRING, 0, 8192), nullptr);
+        if (!reply) return;
+        if (reply->format == 8 && !reply->bytes_after) {
+            const std::string text(static_cast<const char*>(xcb_get_property_value(reply)), xcb_get_property_value_length(reply));
+            if (auto database = XrmGetStringDatabase(text.c_str())) {
+                XrmValue value{};
+                char* kind{};
+                if (XrmGetResource(database, "Xft.dpi", "Xft.Dpi", &kind, &value) && value.addr) {
+                    char* end{};
+                    const double dpi = g_ascii_strtod(value.addr, &end);
+                    while (g_ascii_isspace(*end)) ++end;
+                    if (*end == '\0' && dpi >= 48 && dpi <= 768) status.system_scale = float(dpi / 96.0);
+                }
+                XrmDestroyDatabase(database);
+            }
+        }
+        std::free(reply);
     }
     void Events(){for(int i=0;display && i<16;++i){auto* event=xcb_poll_for_event(display);if(!event)break;const auto type=event->response_type&0x7f;
         if(type==XCB_PROPERTY_NOTIFY){const auto* property=reinterpret_cast<xcb_property_notify_event_t*>(event);if(property->window==root && property->atom==resource)ReadScale();}

@@ -44,7 +44,17 @@
 namespace roots::gui::platform {
 namespace {
 std::atomic_bool active_host{false};
-float ValidScale(float value) { return std::isfinite(value) && value > 0 ? value : 1; }
+float ValidScale(float value) { return value >= .5F && value <= 8.F ? value : 1.F; }
+float LayoutScale(const NativeFrame& frame)
+{
+#if defined(__APPLE__)
+    // Cocoa already reports logical points. Metal uses backing pixels separately.
+    (void)frame;
+    return 1.F;
+#else
+    return std::max(frame.dpi_x, frame.dpi_y);
+#endif
+}
 #ifdef ROOTS_GUI_SDL3
 void RequireSdl(bool ok, const char* message)
 {
@@ -107,9 +117,8 @@ struct NativeHost::Impl {
     std::filesystem::path interface_size_file;
     bool interface_size_invalid{}, interface_size_save_failed{};
     std::optional<bool> last_system_dark;
-    ImFont* regular{};
+    ImFont* body{};
     ImFont* emphasis{};
-    ImFont* monospace{};
     std::string renderer_name;
     std::vector<unsigned char> pixels;
     std::vector<DroppedPaths> drops;
@@ -213,12 +222,17 @@ struct NativeHost::Impl {
             const auto utf8 = (options.font_directory / name).u8string();
             return std::string(utf8.begin(), utf8.end());
         };
-        regular = io.Fonts->AddFontFromFileTTF(font_path("Inter-Regular.ttf").c_str(), 14);
+        ImFontConfig body_config;
+        body_config.SizePixels = ui::theme::BodyFontSize;
+        body = io.Fonts->AddFontDefaultVector(&body_config); // Embedded MIT ProggyForever.
+        if (!body) throw std::runtime_error("required embedded ProggyForever font could not be loaded");
+        ImFontConfig fallback;
+        fallback.MergeMode = true;
+        if (!io.Fonts->AddFontFromFileTTF(font_path("Inter-Regular.ttf").c_str(), body_config.SizePixels, &fallback))
+            throw std::runtime_error("required Inter fallback font could not be loaded");
         emphasis = io.Fonts->AddFontFromFileTTF(font_path("Inter-SemiBold.ttf").c_str(), 20);
-        if (!regular || !emphasis) throw std::runtime_error("required licensed Inter fonts could not be loaded");
-        monospace=io.Fonts->AddFontDefaultVector(); // Embedded MIT ProggyForever; atlas-owned technical face.
-        if (!monospace) throw std::runtime_error("required embedded monospace font could not be loaded");
-        io.FontDefault = regular; // Atlas owns file data; pointers survive all submitted frames.
+        if (!emphasis) throw std::runtime_error("required Inter emphasis font could not be loaded");
+        io.FontDefault = body; // Atlas owns the font sources and merged glyphs.
 #ifdef ROOTS_GUI_SDL3
         RequireSdl(ImGui_ImplSDL3_InitForSDLRenderer(window, sdl_renderer), "SDL3 ImGui backend initialization failed");
         platform = true;
@@ -340,7 +354,7 @@ struct NativeHost::Impl {
 #endif
         if(input)if(auto scale=input->Status().system_scale)f.dpi_x=f.dpi_y=*scale;
         f.dpi_x = ValidScale(f.dpi_x); f.dpi_y = ValidScale(f.dpi_y);
-        f.effective_scale = options.font_scale * std::max(f.dpi_x, f.dpi_y);
+        f.effective_scale = options.font_scale * LayoutScale(f);
         f.should_close = ShouldClose();
         // Some X11 WMs do not answer frame-extents requests for unmapped
         // windows. Decorations are observation metadata, not a rendering input:
@@ -390,13 +404,7 @@ struct NativeHost::Impl {
 #endif
                 continue;
             }
-#if defined(__APPLE__)
-            // Cocoa window coordinates are points. GLFW supplies Retina pixel
-            // scale separately through ImDrawData::FramebufferScale.
-            constexpr float dpi = 1;
-#else
-            const float dpi = std::max(facts.dpi_x, facts.dpi_y);
-#endif
+            const float dpi = LayoutScale(facts);
             if (!options.appearance_file.empty()) {
                 last_system_dark=options.system_appearance_reader?options.system_appearance_reader():system_appearance.Dark();
                 const bool dark=ui::theme::IsDark(choice, last_system_dark.value_or(false));
@@ -409,9 +417,9 @@ struct NativeHost::Impl {
                 glfwSetWindowSizeLimits(window, int(std::ceil(960 * dpi)), int(std::ceil(640 * dpi)), GLFW_DONT_CARE, GLFW_DONT_CARE);
 #endif
                 appearance = {options.dark, options.font_scale, dpi};
-                appearance.monospace=monospace;
+                appearance.monospace=body;
                 theme = ui::MakeBootstrapTheme(appearance);
-                theme.fonts = {regular, emphasis, emphasis};
+                theme.fonts = {body, emphasis, emphasis};
                 ImGui::GetStyle().FontScaleDpi = 1;
                 ui::theme::Apply(theme); // Fresh base tokens; no cumulative size/font scaling.
                 dirty = false;
@@ -441,7 +449,7 @@ struct NativeHost::Impl {
             if (options.fixed_delta_seconds>0) ImGui::GetIO().DeltaTime=options.fixed_delta_seconds;
             ImGui::NewFrame();
             ui::components::NativeInputScope native_scope(input.get());if(input)input->BeginFrame();
-            ImGui::PushFont(regular, theme.typography.body);
+            ImGui::PushFont(body, theme.typography.body);
             if (content) content(theme, appearance);
             else facts.draw = ui::DrawBootstrap(theme, appearance, draw_state);
             if(input){input->EndFrame();input->Pump();}

@@ -36,14 +36,11 @@ stroke pixels. No dependency source, archive, pin or license is changed.
 Disabled content keeps readable text and a dependency explanation; it is never
 made unreadable with global alpha. Selected rows retain normal financial text.
 
-Inter Regular 14px and SemiBold 20px are required, loaded from executable-relative
-licensed assets; missing files fail visibly. Tables use ordinary Inter tabular
-digits. Technical descriptors/hex use the embedded scalable ProggyForever at
-13px. This minimal technical face covers ASCII/Latin technical identifiers;
-body labels use Inter's bundled coverage. Missing general-script glyphs/complex
-shaping remain explicit localization qualification work; no system-font or
-unverified universal-glyph fallback is claimed. Typography/layout scale once
-from base values; framebuffer density remains independent.
+The default body and control face is the scalable ProggyForever embedded in
+Dear ImGui, at 16 px before scaling. Technical descriptors and hex use it at
+13 px. Inter Regular supplies missing glyphs and Inter SemiBold supplies 20 px
+headings. Both Inter files are loaded from the shipped assets. Typography and
+layout scale once from their base sizes. Framebuffer density is independent.
 
 The production bootstrap exposes Light/Dark/System, starts Light, and atomically
 saves its stable lowercase ID to `$XDG_CONFIG_HOME/roots-gui/appearance` or

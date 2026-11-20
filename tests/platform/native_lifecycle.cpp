@@ -66,7 +66,7 @@ struct Observer final : platform::NativeObserver {
     int mode{}, phase{}, minimized_idles{}, min_frame{}, capture_frame{8}, logged_phase{-1}, mapped_frame_queries{};
     bool captured{}, teardown{}, iconified{}, resized{}, scaled{}, recreated{}, closed{}, key_seen{}, mouse_seen{}, capture_seen{};
     int creates{}, updates{};
-    float expected_font{14}, padding{};
+    float expected_font{16}, padding{};
     unsigned long xid{};
     unsigned int old_texture{};
     platform::NativeFrame last;
@@ -103,12 +103,15 @@ struct Observer final : platform::NativeObserver {
             Check(f.draw.close_visible, "primary action visible");
             Check(f.draw.close_x0 >= 0 && f.draw.close_y0 >= 0 && f.draw.close_x1 <= f.width && f.draw.close_y1 <= f.height, "primary action within client bounds");
             // Pinned ImGui::UpdateCurrentSize rounds final sizes with IM_ROUND.
-            Check(std::fabs(f.draw.font_size - std::round(expected_font * f.dpi_x)) < .05F, "font and native DPI applied once with pinned rounding");
+            auto* font = ImGui::GetIO().FontDefault;
+            Check(std::fabs(f.draw.font_size - std::round(expected_font * f.dpi_x)) < .05F &&
+                font && std::string_view(font->GetDebugName()) == "ProggyForever.ttf" && font->IsGlyphInFont(0x0416),
+                "ProggyForever body and Cyrillic coverage with native DPI applied once");
             Check((ImGui::GetIO().ConfigFlags & (ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable)) == 0, "no free docking or detached OS viewports");
             Check(f.font_texture && glIsTexture(f.font_texture), "live uploaded font texture");
             Check(!f.gl_error && !f.rgba.empty(), "real framebuffer readback");
             Ppm(output/(name+".ppm"), f);
-            if (mode == 0 && expected_font == 14) FramePpm(output/(name+"-frame.ppm"), host.Window(), f);
+            if (mode == 0 && expected_font == 16) FramePpm(output/(name+"-frame.ppm"), host.Window(), f);
             captured = true;
             bool rejected{false};
             std::thread wrong_thread([&] { try { host.Window(); } catch (const std::logic_error&) { rejected = true; } });
@@ -122,7 +125,7 @@ struct Observer final : platform::NativeObserver {
                 phase = 2;
             }
             else if (phase == 3 && !f.iconified) { host.SetFontScale(1.5F); phase = 4; }
-            else if (phase == 4 && std::fabs(f.draw.font_size - std::round(21 * f.dpi_x)) < .05F) {
+            else if (phase == 4 && std::fabs(f.draw.font_size - std::round(24 * f.dpi_x)) < .05F) {
                 scaled = true; padding = f.draw.frame_padding_y; host.SetFontScale(1.5F); phase = 5;
             } else if (phase == 5) {
                 Check(f.draw.frame_padding_y == padding, "repeated scale application does not accumulate");
@@ -188,19 +191,19 @@ int main(int argc, char** argv)
         for (int width : {1200, 960}) for (bool dark : {false, true}) for (float scale : {1.F, 1.5F, 2.F}) {
             const int height = width == 1200 ? 820 : 640;
             const auto name = "bootstrap-" + std::to_string(width) + "x" + std::to_string(height) + (dark ? "-dark-" : "-light-") + std::to_string(int(scale * 100));
-            Observer observer(output, name, 0, 14 * scale);
+            Observer observer(output, name, 0, 16 * scale);
             ++cases_started;
             { platform::NativeHost host({width, height, dark, scale, argv[2]}, &observer); Check(host.Run() == 0, "production native run returns success"); }
             observer.Finish(); ++cases_completed;
         }
         for (int mode : {1, 2, 3}) {
-            Observer observer(output, "lifecycle-" + std::to_string(mode), mode, 14);
+            Observer observer(output, "lifecycle-" + std::to_string(mode), mode, 16);
             ++cases_started;
             { platform::NativeHost host({1200, 820, false, 1, argv[2]}, &observer); Check(host.Run() == 0, "repeated production launch/close"); }
             observer.Finish(); ++cases_completed;
         }
         ++cases_started;
-        Observer missing(output, "missing-font-assets", 0, 14); bool font_rejected{false};
+        Observer missing(output, "missing-font-assets", 0, 16); bool font_rejected{false};
         try { platform::NativeHost host({1200, 820, false, 1, output/"nonexistent-font-directory"}, &missing); }
         catch (const std::runtime_error&) { font_rejected = true; }
         Check(font_rejected && missing.teardown && ImGui::GetCurrentContext() == nullptr, "partial font initialization failure cleans owned resources"); ++cases_completed;

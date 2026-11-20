@@ -40,7 +40,7 @@ void Project(const imkit::Theme& theme)
 }
 imkit::Theme Make(bool dark, float scale)
 {
-    if (!std::isfinite(scale) || scale <= 0 || scale > 8) throw std::invalid_argument("invalid theme scale");
+    if (!std::isfinite(scale) || scale <= 0 || scale > 16) throw std::invalid_argument("invalid theme scale");
     auto theme = imkit::MakePrecisionTheme(dark ? imkit::ColorScheme::Dark : imkit::ColorScheme::Light);
     const auto t = Wallet(dark); auto& s = theme.semantic;
     s.canvas=t.canvas; s.surface=t.panel; s.surfaceRaised=t.strong_panel; s.overlay=t.panel;
@@ -48,7 +48,7 @@ imkit::Theme Make(bool dark, float scale)
     s.accent=t.primary; s.onAccent=t.on_primary;
     s.success=t.success.foreground; s.warning=t.warning.foreground; s.error=t.error.foreground;
     s.control={t.panel,t.alternate,t.strong_panel,t.focus,t.strong_panel,t.strong_panel};
-    theme.typography={12*scale,14*scale,14*scale,20*scale,20*scale,13*scale};
+    theme.typography={12*scale,BodyFontSize*scale,BodyFontSize*scale,20*scale,20*scale,13*scale};
     theme.layout.controlHeight=32*scale;
     theme.layout.windowPaddingX=theme.layout.windowPaddingY=24*scale;
     theme.layout.horizontalPadding=12*scale; theme.layout.spacingX=theme.layout.spacingY=8*scale;

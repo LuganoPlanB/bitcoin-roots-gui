@@ -25,6 +25,7 @@ for key, expected in {
     "sqlite": 3054001,
     "imgui": 19297,
     "imkit": "4.1.0",
+    "body_size": 16,
     "native_initialized": False,
     "backend_symbols_linked": True,
 }.items():

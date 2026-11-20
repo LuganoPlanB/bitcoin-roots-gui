@@ -67,6 +67,29 @@ int main(int argc,char** argv)
     { std::ofstream file(directory/"invalid");file<<"unknown"; }
     Check(!LoadAppearance(directory/"invalid").valid,"corruption observable");
     Check(!SaveAppearance(directory/"invalid"/"child",Appearance::Dark),"failed write reported");
+    const auto scale_path=directory/"appearance.scale";
+    const auto before_size=LoadInterfaceSize(directory/"absent");
+    Check(before_size.valid && !before_size.percent,"missing interface size leaves the default intact");
+    for (const int percent : {50,100,125,200}) {
+        Check(SaveInterfaceSize(scale_path,percent),"interface size save");
+        const auto size=LoadInterfaceSize(scale_path);
+        Check(size.valid && size.percent==percent,"interface size round-trip");
+    }
+    Check(!SaveInterfaceSize(scale_path,201) && LoadInterfaceSize(scale_path).percent==200,
+        "out-of-range size preserves the saved preference");
+    for (const auto* invalid : {"49", "201", "100%", "nan", "100\n150", "9999999999999999"}) {
+        { std::ofstream file(scale_path);file<<invalid; }
+        const auto size=LoadInterfaceSize(scale_path);
+        Check(!size.valid && !size.percent,"malformed size does not override the default");
+    }
+    Check(SaveInterfaceSize(scale_path,150),"invalid size can be replaced");
+    auto blocked=scale_path;blocked+=".pending";
+    std::filesystem::create_directory(blocked);
+    Check(!SaveInterfaceSize(scale_path,100) && LoadInterfaceSize(scale_path).percent==150,
+        "failed save leaves the previous size on disk");
+    std::filesystem::remove(blocked);
+    Check(LoadAppearance(directory/"appearance").choice==Appearance::System,
+        "interface size leaves the theme preference intact");
     ImGui::CreateContext();
     ImGui::GetIO().IniFilename=nullptr;
     ImGui_ImplNull_Init();

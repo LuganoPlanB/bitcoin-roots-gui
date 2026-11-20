@@ -14,4 +14,11 @@ bool IsDark(Appearance, bool system_dark);
 struct AppearanceLoad { Appearance choice{Appearance::Light}; bool valid{true}; };
 AppearanceLoad LoadAppearance(const std::filesystem::path&);
 bool SaveAppearance(const std::filesystem::path&, Appearance);
+
+inline constexpr int MIN_INTERFACE_SIZE = 50;
+inline constexpr int DEFAULT_INTERFACE_SIZE = 100;
+inline constexpr int MAX_INTERFACE_SIZE = 200;
+struct InterfaceSizeLoad { int percent{}; bool valid{true}; }; // Zero means no saved size.
+InterfaceSizeLoad LoadInterfaceSize(const std::filesystem::path&);
+bool SaveInterfaceSize(const std::filesystem::path&, int percent);
 }

@@ -104,6 +104,8 @@ struct NativeHost::Impl {
     void* old_clipboard_data{};bool clipboard_hooks{};
     ui::theme::Appearance choice{ui::theme::Appearance::Light};
     bool invalid_saved{},save_failed{};
+    std::filesystem::path interface_size_file;
+    bool interface_size_invalid{}, interface_size_save_failed{};
     std::optional<bool> last_system_dark;
     ImFont* regular{};
     ImFont* emphasis{};
@@ -133,6 +135,12 @@ struct NativeHost::Impl {
             draw_state.show_appearance=true;
             draw_state.appearance_choice=static_cast<int>(choice);
             invalid_saved=!saved.valid;
+
+            interface_size_file = options.appearance_file;
+            interface_size_file += ".scale";
+            const auto size = ui::theme::LoadInterfaceSize(interface_size_file);
+            if (size.percent) options.font_scale = size.percent / 100.F;
+            interface_size_invalid = !size.valid;
         }
         if (options.width < 960 || options.height < 640 || !std::isfinite(options.font_scale) ||
             options.font_scale < .5F || options.font_scale > 2.F) throw std::invalid_argument("invalid native window/font settings");
@@ -616,6 +624,18 @@ void NativeHost::SetFontScale(float scale)
     m_impl->options.font_scale = scale;
     m_impl->dirty = true;
 }
+bool NativeHost::SetInterfaceSize(int percent)
+{
+    m_impl->Owner();
+    if (!ui::theme::SaveInterfaceSize(m_impl->interface_size_file, percent)) {
+        m_impl->interface_size_save_failed = true;
+        return false;
+    }
+    SetFontScale(percent / 100.F);
+    m_impl->interface_size_invalid = false;
+    m_impl->interface_size_save_failed = false;
+    return true;
+}
 bool NativeHost::SetAppearance(int choice)
 {
     m_impl->Owner();
@@ -631,7 +651,9 @@ ui::AppearanceStatus NativeHost::AppearanceState() const
 {
     m_impl->Owner();
     return {m_impl->options.appearance_file.empty()?-1:static_cast<int>(m_impl->choice),m_impl->invalid_saved,m_impl->save_failed,
-        !m_impl->options.appearance_file.empty() && m_impl->choice==ui::theme::Appearance::System && !m_impl->last_system_dark.has_value()};
+        !m_impl->options.appearance_file.empty() && m_impl->choice==ui::theme::Appearance::System && !m_impl->last_system_dark.has_value(),
+        static_cast<int>(std::lround(m_impl->options.font_scale * 100)),
+        m_impl->interface_size_invalid, m_impl->interface_size_save_failed};
 }
 NativeInput& NativeHost::Input(){m_impl->Owner();if(!m_impl->input)throw std::logic_error("native input is not initialized");return *m_impl->input;}
 InputStatus NativeHost::InputState() const {m_impl->Owner();return m_impl->input?m_impl->input->Status():InputStatus{};}

@@ -3,6 +3,7 @@
 #include "ui/shell/workspace.h"
 #include "services/payment_protocols.h"
 #include "ui/theme/theme.h"
+#include "ui/theme/appearance.h"
 #include <algorithm>
 
 namespace roots::gui::ui::shell {
@@ -211,6 +212,24 @@ void DrawGeneralPreferences(State& s,app::Requests& host,Facts& facts,const imki
         const auto label=themes[choice];
         button(label,label,appearance.choice!=choice,[appearance_choice,choice]{return appearance_choice(choice);},appearance.choice==choice);
     }
+    const int percent = appearance.interface_size_percent;
+    const bool can_resize = appearance.choice >= 0;
+    const auto size_label = "Interface size: " + std::to_string(percent) + "%";
+    detail("interface-size", size_label.c_str());
+    const auto resize = [&facts](int next) { facts.interface_size_requested = next; return true; };
+    button("interface-size-decrease", "Decrease size", can_resize && percent > theme::MIN_INTERFACE_SIZE,
+        [resize, percent] { return resize(std::max(theme::MIN_INTERFACE_SIZE, percent - 25)); });
+    ImGui::SameLine();
+    button("interface-size-increase", "Increase size", can_resize && percent < theme::MAX_INTERFACE_SIZE,
+        [resize, percent] { return resize(std::min(theme::MAX_INTERFACE_SIZE, percent + 25)); });
+    ImGui::SameLine();
+    button("interface-size-reset", "Reset size", can_resize &&
+        (percent != theme::DEFAULT_INTERFACE_SIZE || appearance.interface_size_invalid || appearance.interface_size_save_failed),
+        [resize] { return resize(theme::DEFAULT_INTERFACE_SIZE); });
+    if(appearance.interface_size_save_failed)
+        detail("interface-size-error", "Interface size could not be saved. The previous size stays active.");
+    else if(appearance.interface_size_invalid)
+        detail("invalid-interface-size", "Saved interface size is invalid. Choose a size to replace it.");
     constexpr const char* units[]{"BTC","Satoshis","Automatic"};
     for(int unit=0;unit<3;++unit){
         if(unit)ImGui::SameLine();

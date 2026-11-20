@@ -80,6 +80,7 @@ public:
     DesktopRuntime* Desktop();
     std::vector<DroppedPaths> TakeDroppedPaths(); // Owned copy, drained only on host thread.
     void SetFontScale(float scale);
+    bool SetInterfaceSize(int percent); // Saves first, then applies the scale.
     bool SetAppearance(int choice); // Light=0, Dark=1, System=2; acknowledges actual saved preference.
     ui::AppearanceStatus AppearanceState() const; // Current owner-thread snapshot, not mutable host flags.
     AccessibilityStatus AccessibilityState() const;

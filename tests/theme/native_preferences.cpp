@@ -38,6 +38,7 @@ struct Observer final : platform::NativeObserver {
     std::filesystem::path output,metadata;
     bool reopened{},captured{},cleaned{};
     int stage{},checks{},deadline_frame{};
+    float body_size{}, original_body_size{};
     Display* display{};
     int (*motion)(Display*,int,int,int,unsigned long){};
     int (*button)(Display*,unsigned int,Bool,unsigned long){};
@@ -67,7 +68,7 @@ struct Observer final : platform::NativeObserver {
     }
     void Capture(const platform::NativeFrame& frame,const char* name)
     {
-        Check(frame.width==960 && frame.height==640 && frame.effective_scale==1.5F && frame.decorated && !frame.gl_error,"native viewport/backend");
+        Check(frame.width==960 && frame.height==640 && frame.effective_scale==(reopened?1.F:1.5F) && frame.decorated && !frame.gl_error,"native viewport/backend");
         const auto packet=state.presentation.exchange.Published();
         Check(packet && packet->valid && !packet->nodes.empty(),"native dialog semantics");
         const auto text=state.presentation.Snapshot();
@@ -89,6 +90,8 @@ struct Observer final : platform::NativeObserver {
         const auto snapshot=state.presentation.Snapshot();
         switch(stage){
         case 0:
+            Check(frame.effective_scale==(reopened?2.F:1.5F),
+                "saved size is loaded immediately in a new process");
             Check(!requests.connection.Active() && requests.probes==0 && requests.external_requests==0,"startup is network-silent");
             Check(!requests.recovery.Enabled() && !requests.recovery.Pending(),"document recovery off");
             Check(state.privacy.hidden==reopened && state.unit==int(reopened) && state.privacy.trim_decimals==reopened,"fresh process has expected preferences");
@@ -102,13 +105,9 @@ struct Observer final : platform::NativeObserver {
             Check(state.general.saved && state.general.saved->preferences.explorer==ExplorerMode::Disabled,"explorer disabled by default");
             if(reopened){
                 Check(facts.preferences.at("Dark").disabled,"native theme persisted in fresh process");
-                auto separate=storage::MetadataStore::Open(metadata);
-                Check(bool(separate),"disposable second preferences writer");
-                auto newer=(*separate.value)->LoadWorkspace();
-                Check(bool(newer),"second writer reads saved revisions");
-                newer.value->preferences.group_address_outputs=false;
-                Check(bool((*separate.value)->SaveWorkspace(*newer.value)),"second writer advances revision");
-                Press(host,"BTC");stage=20;break;
+                Check(snapshot.find("Interface size: 200%")!=std::string::npos,
+                    "Preferences shows the saved interface size");
+                Press(host,"interface-size-reset");stage=22;break;
             }
             Press(host,"Satoshis");stage=3;break;
         case 3:Release();stage=4;break;
@@ -122,12 +121,40 @@ struct Observer final : platform::NativeObserver {
             if(frame.rendered_frames<deadline_frame || !state.privacy.hidden)break;
             Check(state.general.saved && state.general.saved->revision==3 && state.general.saved->preferences.hide_balances,"immediate acknowledged save");
             Capture(frame,"preferences-general");
-            Press(host,"close");stage=11;break;
+            original_body_size=body_size;
+            Press(host,"interface-size-increase");stage=13;break;
         case 11:Release();stage=12;break;
         case 12:
             if(facts.preferences_visible)break;
             Check(state.privacy.hidden && snapshot.find("0.01000000")==std::string::npos,"live hidden amount stays hidden on close");
             host.RequestClose();break;
+        case 13:Release();stage=14;break;
+        case 14:
+            if(frame.effective_scale!=1.75F)break;
+            Check(body_size>original_body_size && facts.preferences_visible,
+                "larger font is applied live with Preferences still open");
+            Press(host,"interface-size-increase");stage=15;break;
+        case 15:Release();stage=16;break;
+        case 16:
+            if(frame.effective_scale!=2.F)break;
+            Check(facts.preferences.at("interface-size-increase").disabled
+                && facts.preferences.at("interface-size-decrease").visible,
+                "size can be decreased at the maximum scale in a minimum-size window");
+            Press(host,"close");stage=11;break;
+        case 22:Release();stage=23;break;
+        case 23:
+            if(frame.effective_scale!=1.F)break;
+            Check(facts.preferences.at("interface-size-reset").disabled,
+                "Reset size applies 100% immediately");
+            {
+                auto separate=storage::MetadataStore::Open(metadata);
+                Check(bool(separate),"disposable second preferences writer");
+                auto newer=(*separate.value)->LoadWorkspace();
+                Check(bool(newer),"second writer reads saved revisions");
+                newer.value->preferences.group_address_outputs=false;
+                Check(bool((*separate.value)->SaveWorkspace(*newer.value)),"second writer advances revision");
+                Press(host,"BTC");stage=20;break;
+            }
         case 20:Release();stage=21;deadline_frame=frame.rendered_frames+8;break;
         case 21:
             if(frame.rendered_frames<deadline_frame)break;
@@ -170,6 +197,7 @@ int main(int argc,char** argv)
         platform::NativeHost* current{};
         {
             platform::NativeHost host(options,&observer,[&](const imkit::Theme& theme,const ui::BootstrapAppearance& appearance){
+                observer.body_size=ImGui::GetFontSize();
                 observer.facts=platform::DrawShellFrame(*current,observer.state,observer.requests,theme,appearance);
             });
             current=&host;host.Run();

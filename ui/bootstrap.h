@@ -8,6 +8,8 @@ namespace roots::gui::ui {
 struct AppearanceStatus {
     int choice{-1}; // Light=0, Dark=1, System=2; -1 means no preference path.
     bool invalid_saved{},save_failed{},system_unavailable{};
+    int interface_size_percent{100};
+    bool interface_size_invalid{}, interface_size_save_failed{};
 };
 struct BootstrapAppearance { bool dark{false}; float font_scale{1}, dpi_scale{1}; ImFont* monospace{}; AppearanceStatus status; bool reduced_motion{}; };
 struct BootstrapFacts {

@@ -10,11 +10,17 @@
 #include "app/broadcast.h"
 #include "app/history_workspace.h"
 #include "services/addresses.h"
+#ifdef ROOTS_GUI_SDL3
+#include <SDL3/SDL_version.h>
+#include <imgui_impl_sdl3.h>
+#include <imgui_impl_sdlrenderer3.h>
+#else
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <imgui_impl_glfw.h>
 #if !defined(__APPLE__)
 #include <imgui_impl_opengl3.h>
+#endif
 #endif
 #include <cstdio>
 #include <algorithm>
@@ -83,7 +89,7 @@ bool AdoptGuiRestart(ui::shell::State& workspace,app::Requests& requests,const R
 ui::shell::Facts DrawShellFrame(NativeHost& host,ui::shell::State& workspace,app::Requests& requests,const imkit::Theme& theme,const ui::BootstrapAppearance& appearance)
 {
     ui::shell::SyncGeneralPreferences(workspace,requests.Recovery());
-    if (workspace.local_document.camera_generation && !glfwGetWindowAttrib(host.Window(),GLFW_FOCUSED)) {
+    if (workspace.local_document.camera_generation && !host.Focused()) {
         workspace.notice="Camera closed when the window lost focus.";
         ui::shell::RetireLocalDocument(workspace,requests);
     }
@@ -357,6 +363,15 @@ ui::shell::Facts DrawShellFrame(NativeHost& host,ui::shell::State& workspace,app
 }
 std::string BuildInfo()
 {
+#ifdef ROOTS_GUI_SDL3
+    const int version = SDL_GetVersion();
+    auto* volatile platform_entry = &ImGui_ImplSDL3_InitForSDLRenderer;
+    auto* volatile renderer_entry = &ImGui_ImplSDLRenderer3_Init;
+    return "\"sdl3\":\"" + std::to_string(SDL_VERSIONNUM_MAJOR(version)) + "." +
+        std::to_string(SDL_VERSIONNUM_MINOR(version)) + "." + std::to_string(SDL_VERSIONNUM_MICRO(version)) +
+        "\",\"renderer\":\"SDL_Renderer (software)\",\"backend_symbols_linked\":" +
+        (platform_entry && renderer_entry ? "true" : "false") + ",\"native_initialized\":false";
+#else
     auto* volatile platform_entry = &ImGui_ImplGlfw_InitForOther;
 #if defined(__APPLE__)
     const bool renderer_linked = false; // Metal native host remains follow-on work.
@@ -366,6 +381,7 @@ std::string BuildInfo()
 #endif
     return "\"glfw\":\"" + std::string(glfwGetVersionString()) + "\",\"backend_symbols_linked\":" +
            (platform_entry && renderer_linked ? "true" : "false") + ",\"native_initialized\":false";
+#endif
 }
 int Run(std::optional<RestartContext> resumed)
 {

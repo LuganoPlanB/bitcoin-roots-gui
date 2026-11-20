@@ -10,9 +10,6 @@
 #include <utility>
 #include <cstdlib>
 #if defined(__linux__)
-#define GLFW_EXPOSE_NATIVE_X11
-#include <GLFW/glfw3.h>
-#include <GLFW/glfw3native.h>
 #include <gio/gio.h>
 #include <X11/Xatom.h>
 #include <X11/Xresource.h>
@@ -29,7 +26,7 @@ constexpr size_t TextLimit=65536;
 bool Valid(std::string_view text){return text.size()<=TextLimit && text.find('\0')==text.npos && g_utf8_validate(text.data(),text.size(),nullptr);}
 struct ReadResult {bool ok{};std::string text,detail;};
 ReadResult ReadSelection(GCancellable* cancel) {
-    // This worker owns its entire Xlib connection. No GLFW, ImGui, editor or
+    // This worker owns its entire Xlib connection. No window backend, ImGui, editor or
     // document state crosses the thread boundary. One read is admitted at once.
     Display* d=XOpenDisplay(nullptr);if(!d)return {false,{},"Clipboard display is unavailable."};
     const auto window=XCreateSimpleWindow(d,DefaultRootWindow(d),0,0,1,1,0,0,0);
@@ -59,12 +56,12 @@ ReadResult ReadSelection(GCancellable* cancel) {
 }
 }
 struct NativeInput::Impl:std::enable_shared_from_this<Impl> {
-    const std::thread::id owner=std::this_thread::get_id();GLFWwindow* window{};xcb_connection_t* display{};xcb_window_t root{},selection{};xcb_atom_t clip{},utf8{},targets{},resource{};
+    const std::thread::id owner=std::this_thread::get_id();unsigned long window{};xcb_connection_t* display{};xcb_window_t root{},selection{};xcb_atom_t clip{},utf8{},targets{},resource{};
     GMainContext* context=g_main_context_new();GCancellable* read_cancel=g_cancellable_new();GSettings* settings{};gulong setting_signal{};InputStatus status;unsigned jobs{};bool closing{},hidden{},copy_sensitive{};std::string copied,view;
     uint32_t editor{};bool editor_sensitive{},editor_protected{},paste_seen{},file_seen{};uint64_t sequence{},paste_epoch{};
     struct PasteRequest {uint64_t epoch{};uint32_t target{};bool sensitive{},protected_editor{},snapshot{},ready{};std::string scope,before,text;int cursor{},start{},end{};};std::optional<PasteRequest> paste;
     GSubprocess* process{};GCancellable* pipe_cancel{};uint64_t file_id{};bool waited{},out_done{},err_done{},file_cancelled{},file_failed{};std::string output,errors;int exit_status{};c::FileChoice choice;
-    explicit Impl(GLFWwindow* value):window(value){}
+    explicit Impl(unsigned long value):window(value){}
     void Owner() const {if(owner!=std::this_thread::get_id())throw std::logic_error("native input requires host owner thread");}
     struct Context {GMainContext* p;explicit Context(GMainContext* value):p(value){g_main_context_push_thread_default(p);}~Context(){g_main_context_pop_thread_default(p);}};
     void* Hold(){++jobs;return new std::shared_ptr<Impl>(shared_from_this());}
@@ -76,7 +73,7 @@ struct NativeInput::Impl:std::enable_shared_from_this<Impl> {
             auto iterator=xcb_setup_roots_iterator(xcb_get_setup(display));while(screen-- && iterator.rem)xcb_screen_next(&iterator);if(iterator.rem){root=iterator.data->root;selection=xcb_generate_id(display);const uint32_t mask=XCB_EVENT_MASK_PROPERTY_CHANGE;
                 status.clipboard=Checked(xcb_create_window_checked(display,0,selection,root,0,0,1,1,0,XCB_WINDOW_CLASS_INPUT_ONLY,XCB_COPY_FROM_PARENT,XCB_CW_EVENT_MASK,&mask));
                 clip=AtomFor("CLIPBOARD");utf8=AtomFor("UTF8_STRING");targets=AtomFor("TARGETS");resource=AtomFor("RESOURCE_MANAGER");Checked(xcb_change_window_attributes_checked(display,root,XCB_CW_EVENT_MASK,&mask));ReadScale();}}
-        auto* executable=g_find_program_in_path("zenity");status.file_dialog=executable!=nullptr;g_free(executable);
+        auto* executable=g_find_program_in_path("zenity");status.file_dialog=window && executable!=nullptr;g_free(executable);
         auto* source=g_settings_schema_source_get_default();auto* schema=source?g_settings_schema_source_lookup(source,"org.gnome.desktop.interface",true):nullptr;
         if(schema){if(g_settings_schema_has_key(schema,"enable-animations")){Context push(context);settings=g_settings_new_full(schema,nullptr,nullptr);status.reduced_motion=!g_settings_get_boolean(settings,"enable-animations");setting_signal=g_signal_connect(settings,"changed::enable-animations",G_CALLBACK(SettingsChanged),this);}g_settings_schema_unref(schema);}
     }
@@ -120,14 +117,14 @@ struct NativeInput::Impl:std::enable_shared_from_this<Impl> {
     void FinishFile(){if(!process || !waited || !out_done || !err_done)return;status.dialog_process.clear();if(file_cancelled || closing)choice={c::NativeOutcome::Cancelled,{},"File selection cancelled."};else if(!file_failed && exit_status==1)choice={c::NativeOutcome::Cancelled,{},"File selection cancelled."};else if(file_failed || exit_status!=0)choice={c::NativeOutcome::Failed,{},"Native file chooser failed; current path retained."};else{if(!output.empty() && output.back()=='\n')output.pop_back();if(output.empty() || output.size()>4096 || !Valid(output))choice={c::NativeOutcome::Failed,{},"Native file chooser returned an invalid path."};else choice={c::NativeOutcome::Chosen,output,{}};}}
     void CancelFile(){if(process && choice.outcome==c::NativeOutcome::Pending){file_cancelled=true;g_cancellable_cancel(pipe_cancel);g_subprocess_force_exit(process);++status.cancelled;}}
     uint64_t Choose(std::string_view initial,bool save,const char* title="--title=Choose public wallet or transaction file"){Owner();if(closing || !status.file_dialog || jobs || (process && !waited))return 0;if(initial.size()>4096 || !Valid(initial))return 0;if(process){g_object_unref(process);process=nullptr;}if(pipe_cancel)g_object_unref(pipe_cancel);pipe_cancel=g_cancellable_new();output.clear();errors.clear();waited=out_done=err_done=file_cancelled=file_failed=false;exit_status=0;file_id=++sequence;file_seen=true;
-        std::vector<std::string> args{"zenity","--file-selection","--modal",title,"--attach="+std::to_string(glfwGetX11Window(window))};if(save){args.push_back("--save");args.push_back("--confirm-overwrite");}if(!initial.empty())args.push_back("--filename="+std::string(initial));std::vector<const char*> argv;for(auto& s:args)argv.push_back(s.c_str());argv.push_back(nullptr);GError* error{};Context push(context);process=g_subprocess_newv(argv.data(),GSubprocessFlags(G_SUBPROCESS_FLAGS_STDOUT_PIPE|G_SUBPROCESS_FLAGS_STDERR_PIPE),&error);
+        std::vector<std::string> args{"zenity","--file-selection","--modal",title,"--attach="+std::to_string(window)};if(save){args.push_back("--save");args.push_back("--confirm-overwrite");}if(!initial.empty())args.push_back("--filename="+std::string(initial));std::vector<const char*> argv;for(auto& s:args)argv.push_back(s.c_str());argv.push_back(nullptr);GError* error{};Context push(context);process=g_subprocess_newv(argv.data(),GSubprocessFlags(G_SUBPROCESS_FLAGS_STDOUT_PIPE|G_SUBPROCESS_FLAGS_STDERR_PIPE),&error);
         if(!process){choice={c::NativeOutcome::Failed,{},"Native file chooser could not start."};if(error)g_error_free(error);return file_id;}choice={c::NativeOutcome::Pending,{},{}};status.notice.clear();status.dialog_process=g_subprocess_get_identifier(process);ReadPipe(false);ReadPipe(true);g_subprocess_wait_async(process,nullptr,WaitDone,Hold());return file_id;
     }
     void Pump(){Owner();Events();const auto until=Clock::now()+std::chrono::milliseconds(2);for(int i=0;i<16 && Clock::now()<until;++i)if(!g_main_context_iteration(context,false))break;}
     bool Close(){Owner();if(closing)return jobs==0;closing=true;status.closed=true;CancelPaste();CancelFile();g_cancellable_cancel(read_cancel);if(settings){if(setting_signal)g_signal_handler_disconnect(settings,setting_signal);g_object_unref(settings);settings=nullptr;}const auto until=Clock::now()+std::chrono::milliseconds(2500);while(jobs && Clock::now()<until){Pump();std::this_thread::sleep_for(std::chrono::milliseconds(1));}if(display){if(status.clipboard && SelectionOwner()==selection)Checked(xcb_set_selection_owner_checked(display,XCB_WINDOW_NONE,clip,XCB_CURRENT_TIME));if(selection)Checked(xcb_destroy_window_checked(display,selection));xcb_disconnect(display);display=nullptr;}status.clipboard=status.file_dialog=false;status.settled=jobs==0;return status.settled;}
     ~Impl(){if(process)g_object_unref(process);if(pipe_cancel)g_object_unref(pipe_cancel);g_object_unref(read_cancel);g_main_context_unref(context);}
 };
-NativeInput::NativeInput(GLFWwindow* window):impl(std::make_shared<Impl>(window)){impl->Start();}
+NativeInput::NativeInput(unsigned long window):impl(std::make_shared<Impl>(window)){impl->Start();}
 NativeInput::~NativeInput(){impl->Close();}
 void NativeInput::Pump(){impl->Pump();}
 void NativeInput::BeginFrame(){impl->Owner();impl->paste_seen=false;impl->file_seen=false;}
@@ -176,7 +173,7 @@ void NativeInput::PrivacyLock(){Privacy(true);}
 void NativeInput::EnterProtectedEditor(uint32_t){}
 uint64_t NativeInput::ChooseRpcCookie(){return 0;}
 bool NativeInput::NativeDialogActive() const{return false;}
-NativeInput::NativeInput(GLFWwindow*):impl(std::make_shared<Impl>()){}
+NativeInput::NativeInput(unsigned long):impl(std::make_shared<Impl>()){}
 NativeInput::~NativeInput()=default;void NativeInput::Pump(){}void NativeInput::BeginFrame(){}void NativeInput::EndFrame(){}void NativeInput::BeginView(std::string_view){}void NativeInput::Privacy(bool){}bool NativeInput::Copy(std::string_view,bool){return false;}const char* NativeInput::ClipboardForPaste(){return "";}void NativeInput::EnterEditor(uint32_t,bool){}void NativeInput::LeaveEditor(){}std::optional<std::string> NativeInput::Paste(uint32_t,std::string_view,int,int,int,size_t){return {};}bool NativeInput::FileChooserAvailable() const{return false;}uint64_t NativeInput::ChooseFile(std::string_view,bool){return 0;}c::FileChoice NativeInput::PollFile(uint64_t){return {c::NativeOutcome::Unavailable,{},"Native adapter requires platform implementation."};}InputStatus NativeInput::Status() const{return impl->status;}bool NativeInput::Close(){impl->status.closed=true;return true;}
 #endif
 }

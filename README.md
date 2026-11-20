@@ -16,7 +16,7 @@ disabled. Private keys belong to the connected wallet or external signer.
 
 ## Build
 
-Linux with X11/OpenGL is the supported build path. Use CMake 3.22 or newer,
+Linux with GLFW and OpenGL over X11 is the default build path. Use CMake 3.22 or newer,
 GCC 12.1+ or Clang 17+, Python 3.10+, Ninja, Git, and pkg-config. On Debian or
 Ubuntu, install the native development prerequisites:
 
@@ -55,6 +55,11 @@ cmake --install ../roots-gui-build --prefix "$HOME/.local"
 The installed binary uses the system's OpenSSL, libsodium, and desktop libraries.
 See [build details](docs/build.md) and [Linux distribution packaging](docs/linux-package.md)
 for the separate relocatable package workflow.
+
+Set `-DROOTS_GUI_SDL3=ON` for the fully static Linux SDL3 build. Use an external
+musl dependency tree and the Dyne musl toolchain as shown in the
+[static build instructions](docs/build.md#static-sdl3-build). Keep GLFW for
+Debug developer builds and the AT-SPI2 automation.
 
 ## Test
 

@@ -14,6 +14,7 @@ modules. Preserve these notices and the full original files in distributions.
 | Dear ImGui 19297 docking and selected backends | Omar Cornut, 2014–2026; MIT | `imgui/LICENSE.txt`; backend source headers |
 | Bundled STB support within ImGui | Sean Barrett and individual contributors; original public-domain/MIT notices | Complete embedded notices in `imgui/imstb_*.h`; covered distribution also retains ImGui MIT license |
 | GLFW 3.5.1 | Marcus Geelnard, Camilla Löwy and contributors; zlib/libpng | `glfw/LICENSE.md`; original platform source notices |
+| SDL 3.4.20 | Sam Lantinga and contributors; zlib | `sdl3/LICENSE.txt`; original source and bundled dependency notices |
 | GLFW bundled Vulkan definitions | Khronos Group and retained authors; Apache-2.0 | `glfw/deps/glad/vulkan.h` original attribution; full Apache terms also in shared `licenses/Apache-2.0.txt` |
 | GLFW unused example/test support and Wayland protocols | Kim Gräsman getopt BSD-3-Clause; Marcus Geelnard tinycthread zlib; STB/Nuklear public-domain or their embedded alternative grants; individual MIT/X11 Wayland protocol grants | Complete original notices in `glfw/deps/`; no examples/tests/Wayland targets are compiled |
 | Inter 4.1 Regular/SemiBold | The Inter Project Authors, 2016; SIL OFL 1.1 | `imkit/assets/fonts/Inter-OFL.txt`; unmodified host-loaded fonts, not sold separately |

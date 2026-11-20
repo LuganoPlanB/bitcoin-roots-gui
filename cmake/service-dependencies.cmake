@@ -19,6 +19,12 @@ function(roots_gui_add_service_dependencies source_dir)
   endforeach()
   set(CURL_ENABLE_SSL ON)
   set(CURL_USE_OPENSSL ON)
+  if(ROOTS_GUI_SDL3 AND NOT DEFINED CURL_CA_BUNDLE)
+    # curl skips CA auto-detection when cross-compiling. Use the deployed
+    # Linux system bundle, never the build sysroot's certificate files.
+    set(CURL_CA_BUNDLE "/etc/ssl/certs/ca-certificates.crt" CACHE FILEPATH
+      "Runtime CA bundle for the static SDL3 executable")
+  endif()
   foreach(feature CURL_ZLIB CURL_BROTLI CURL_ZSTD USE_NGHTTP2 CURL_USE_LIBPSL
       CURL_USE_LIBSSH2 CURL_USE_LIBSSH CURL_USE_GSSAPI CURL_USE_LIBIDN2)
     set(${feature} OFF)

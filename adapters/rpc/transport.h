@@ -28,6 +28,9 @@ class CookieCredentials final : public CredentialSource {
 public:
     std::optional<Credentials> Resolve(const CredentialReference&, std::string_view origin) override;
 };
+// Suggest a local endpoint using file metadata and a short TCP connection.
+// The cookie is read only when the user explicitly tests the profile.
+std::optional<ConnectionProfile> FindLocalRpcProfile(uint16_t port);
 enum class Error {
     None, InvalidProfile, InvalidRequest, CredentialsUnavailable, Configuration,
     Cancelled, Timeout, Resolve, Proxy, Tls, Connection, Http, Authentication,

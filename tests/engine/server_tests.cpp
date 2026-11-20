@@ -49,7 +49,12 @@ void RegisterServerTests(ImGuiTestEngine* engine)
             if (candidate.connection.port == 2) result.error = rpc::Error::Connection;
             return result;
         }); // GUI-owned service: Test Engine constructs Vars on its coroutine.
-        if (!s.opened) { s.panel.credential.SetDraft("/explicit/fixture-cookie"); ui::OpenServer(s.panel, *s.service); s.opened = true; }
+        if (!s.opened) {
+            s.panel.suggested_cookie = "/fixture/.bitcoin/.cookie";
+            s.panel.credential.SetDraft(s.panel.suggested_cookie);
+            ui::OpenServer(s.panel, *s.service);
+            s.opened = true;
+        }
         const auto theme = ui::MakeBootstrapTheme({}); ui::theme::Scope scope(theme);
         const auto current = [&] { return std::to_string(s.panel.dialog.open) + ':' + std::to_string(s.panel.scope_revision) + ':' + std::to_string(s.panel.scope_session); };
         s.presentation.Begin(current(), current);
@@ -61,6 +66,8 @@ void RegisterServerTests(ImGuiTestEngine* engine)
     test->TestFunc = [](ImGuiTestContext* ctx) {
         auto& s = ctx->GetVars<Fixture>(); ctx->SetRef("###server");
         IM_CHECK(!s.service->Active() && !s.can_apply);
+        IM_CHECK(s.calls==0 && !s.facts.items.at("test").disabled);
+        IM_CHECK(s.service->Draft().connection.credential.reference=="/fixture/.bitcoin/.cookie");
         ctx->ItemClick("**/test/Test Connection");
         for (int i = 0; i < 20 && !s.can_apply; ++i) { std::this_thread::sleep_for(std::chrono::milliseconds(1)); ctx->Yield(); }
         IM_CHECK(s.can_apply); IM_CHECK(!s.service->Active());
@@ -73,11 +80,13 @@ void RegisterServerTests(ImGuiTestEngine* engine)
         IM_CHECK(s.panel.source==ui::ServerSource::PublicIndex && s.facts.items.at("apply").disabled);
         IM_CHECK(s.calls==1 && s.service->Active()->candidate==original);
         ctx->ItemClick(s.facts.items.at("Direct RPC").id);
+        ctx->ItemInputValue("**/port/###input", "2");
+        IM_CHECK(s.service->Draft().connection.credential.reference.empty());
+        IM_CHECK(s.facts.items.at("test").disabled);
         ctx->ItemClick(s.facts.items.at("browse-cookie").id);
         ctx->Yield(2);
         IM_CHECK(s.service->Draft().connection.credential.reference=="/explicit/picked-cookie");
         IM_CHECK(s.calls==1 && s.service->Active()->candidate==original && !s.can_apply);
-        ctx->ItemInputValue("**/port/###input", "2");
         IM_CHECK(!s.can_apply);
         ctx->ItemClick("**/test/Test Connection");
         for (int i = 0; i < 20 && s.service->Busy(); ++i) { std::this_thread::sleep_for(std::chrono::milliseconds(1)); ctx->Yield(); }

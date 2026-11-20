@@ -53,7 +53,7 @@ jobs:
           export CCACHE_MAXSIZE=200M
           cmake -S . -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DROOTS_GUI_BUILD_TESTS=ON \
             -DROOTS_GUI_VERSION="$ROOTS_GUI_VERSION"
-          cmake --build "$build" --target roots-gui roots_gui_windows_input roots_gui_windows_rpc -j 2
+          cmake --build "$build" --target roots-gui roots_gui_windows_input roots_gui_windows_rpc roots_gui_local_rpc_probe -j 2
           ctest --test-dir "$build" --no-tests=error --output-on-failure
       - uses: actions/cache/save@v4
         if: always() && steps.compiler-cache.outputs.cache-hit != 'true'

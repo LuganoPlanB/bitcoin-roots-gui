@@ -10,8 +10,24 @@ optional exact daemon wallet name. TLS verifies peer and hostname; an explicit
 CA, SOCKS5 with proxy DNS and HTTP CONNECT are supported. The current desktop
 composition supplies cookie credentials. Enter the exact absolute path or use
 the local file chooser when available. Password authentication requires a
-native credential provider. Normal startup reads no cookie, searches no node
-home and makes no RPC call. A direct onion profile is rejected before credential
+native credential provider.
+
+On a normal launch with no pending recovery, the GUI checks for a regular
+cookie file in the default mainnet location and attempts a short TCP connection
+to `127.0.0.1:8332`. When both are present, it opens the Server form with the
+local endpoint and cookie path filled in. Discovery reads no cookie contents
+and issues no RPC. Use Test Connection to verify the node and Apply to activate
+the profile. Editing the endpoint or enabling a proxy clears the suggested
+cookie path. Use the manual Server form for custom ports, data directories,
+or cookie paths.
+
+| Platform | Default cookie |
+| --- | --- |
+| Linux | `~/.bitcoin/.cookie` |
+| macOS | `~/Library/Application Support/Bitcoin/.cookie` |
+| Windows | `%LOCALAPPDATA%\Bitcoin\.cookie`, with `%APPDATA%\Bitcoin\.cookie` preferred when present for an existing installation |
+
+A direct onion profile is rejected before credential
 resolution. SOCKS5 delegates DNS, and HTTP CONNECT delegates origin routing.
 
 Test Connection starts one cancellable worker with a 30-second total budget.

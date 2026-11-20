@@ -126,7 +126,9 @@ struct NativeHost::Impl {
             options.font_scale < .5F || options.font_scale > 2.F) throw std::invalid_argument("invalid native window/font settings");
         if (!std::isfinite(options.fixed_delta_seconds) || options.fixed_delta_seconds<0 || options.fixed_delta_seconds>1)
             throw std::invalid_argument("invalid presentation clock");
+#if !defined(_WIN32)
         unsigned long x11_window{};
+#endif
 #ifdef ROOTS_GUI_SDL3
         RequireSdl(SDL_SetHintWithPriority(SDL_HINT_VIDEO_DRIVER, "x11", SDL_HINT_OVERRIDE), "X11 driver selection failed");
         RequireSdl(SDL_Init(SDL_INIT_VIDEO), "SDL3 initialization failed");
@@ -202,7 +204,11 @@ struct NativeHost::Impl {
 #endif
         renderer = true;
         if(options.accessibility)accessibility=std::make_unique<LinuxAccessibility>(*options.accessibility);
+#if defined(_WIN32)
+        input=std::make_unique<NativeInput>(window);
+#else
         input=std::make_unique<NativeInput>(x11_window);
+#endif
         if(input->Status().clipboard){auto& platform_io=ImGui::GetPlatformIO();old_clipboard_get=platform_io.Platform_GetClipboardTextFn;old_clipboard_set=platform_io.Platform_SetClipboardTextFn;old_clipboard_data=platform_io.Platform_ClipboardUserData;platform_io.Platform_ClipboardUserData=input.get();clipboard_hooks=true;
             platform_io.Platform_GetClipboardTextFn=[](ImGuiContext*){return static_cast<NativeInput*>(ImGui::GetPlatformIO().Platform_ClipboardUserData)->ClipboardForPaste();};
             platform_io.Platform_SetClipboardTextFn=[](ImGuiContext*,const char* text){if(text)static_cast<NativeInput*>(ImGui::GetPlatformIO().Platform_ClipboardUserData)->Copy(text);};

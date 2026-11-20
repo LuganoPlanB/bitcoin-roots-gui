@@ -4,7 +4,6 @@
 #include "ui/components/native_input.h"
 #include <memory>
 #include <optional>
-struct GLFWwindow;
 namespace roots::gui::platform {
 struct InputStatus {
     bool clipboard{},file_dialog{},closed{},settled{true};
@@ -16,7 +15,7 @@ struct InputStatus {
 };
 class NativeInput final:public ui::components::NativeInputPort {
 public:
-    explicit NativeInput(GLFWwindow*);
+    explicit NativeInput(unsigned long x11_window);
     ~NativeInput();
     void Pump();
     void BeginFrame();

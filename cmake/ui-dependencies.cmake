@@ -20,6 +20,29 @@ function(roots_gui_add_ui_dependencies source_dir)
   target_compile_features(roots_gui_imkit PUBLIC cxx_std_20)
   target_link_libraries(roots_gui_imkit PUBLIC ${IMKIT_IMGUI_TARGET})
 
+  if(ROOTS_GUI_SDL3)
+    set(SDL_STATIC ON)
+    set(SDL_SHARED OFF)
+    set(SDL_INSTALL OFF)
+    set(SDL_TEST_LIBRARY OFF)
+    # Software rendering and a statically linked X11 driver avoid runtime GPU
+    # driver modules, which cannot be loaded by a static musl executable.
+    set(SDL_X11 ON)
+    foreach(feature AUDIO CAMERA JOYSTICK HAPTIC SENSOR HIDAPI GPU VULKAN
+        OPENGL OPENGLES WAYLAND KMSDRM DBUS IBUS LIBURING DEPS_SHARED
+        X11_SHARED X11_XCURSOR X11_XINPUT X11_XFIXES X11_XRANDR
+        X11_XSCRNSAVER X11_XTEST LIBTHAI)
+      set(SDL_${feature} OFF)
+    endforeach()
+    add_subdirectory("${source_dir}/sdl3" "${CMAKE_CURRENT_BINARY_DIR}/sdl3" EXCLUDE_FROM_ALL)
+    add_library(roots_gui_backends STATIC
+      "${source_dir}/imgui/backends/imgui_impl_sdl3.cpp"
+      "${source_dir}/imgui/backends/imgui_impl_sdlrenderer3.cpp")
+    target_include_directories(roots_gui_backends PUBLIC "${source_dir}/imgui/backends")
+    target_link_libraries(roots_gui_backends PUBLIC roots_gui_imgui SDL3::SDL3-static)
+    return()
+  endif()
+
   set(GLFW_BUILD_DOCS OFF)
   set(GLFW_BUILD_TESTS OFF)
   set(GLFW_BUILD_EXAMPLES OFF)

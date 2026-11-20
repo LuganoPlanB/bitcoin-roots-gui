@@ -20,6 +20,11 @@ IMKIT = "986d8d286a74fb7b2f724b9ef5d008af139aa887"
 IMGUI = "367b2c24f399988ddafc0bb4628da0106bcc09be"
 CORE = "widgets theme theme_text decor components icons accessibility patterns workflow toast charts range_slider ptz shell window_frame".split()
 ARCHIVES = {
+    "SDL3-3.4.20.tar.gz": (
+        "sdl3",
+        "https://github.com/libsdl-org/SDL/releases/download/release-3.4.20/SDL3-3.4.20.tar.gz",
+        "f3bb06f55bed9557227a700af2ea62e49497ebdf58037732a731a5fb3ef8581f",
+    ),
     "glfw-upstream.tar.gz": (
         "glfw",
         "https://codeload.github.com/glfw/glfw/tar.gz/d9d6f0f1f967807ffade6598ea9a631ebaf37a56",
@@ -146,7 +151,12 @@ def main():
         "backends/imgui_impl_opengl3_loader.h",
         "backends/imgui_impl_metal.mm",
         "backends/imgui_impl_metal.h",
+        "backends/imgui_impl_sdl3.cpp",
+        "backends/imgui_impl_sdl3.h",
+        "backends/imgui_impl_sdlrenderer3.cpp",
+        "backends/imgui_impl_sdlrenderer3.h",
         "examples/example_glfw_opengl3/main.cpp",
+        "examples/example_sdl3_sdlrenderer3/main.cpp",
     ]:
         git_add(args.imgui_repository, IMGUI, path, "imgui")
     for filename, (name, url, expected) in ARCHIVES.items():
@@ -211,7 +221,8 @@ def main():
         ),
         glfw=dict(version="3.5.1", revision="d9d6f0f1f967807ffade6598ea9a631ebaf37a56"),
         acquiredArchives=ARCHIVES,
-        selection="ImKit core include closure, 15 core units and Inter assets; no editor/show/Gallery units. ImGui core/matching selected backends. GLFW/curl full source archives; SQLite amalgamation; X11 headers/notices only.",
+        sdl3=dict(version="3.4.20"),
+        selection="ImKit core include closure, 15 core units and Inter assets; no editor/show/Gallery units. ImGui core/matching selected backends. SDL3/GLFW/curl full source archives; SQLite amalgamation; X11 headers/notices only.",
         modifications="Source bytes unchanged; selected regular archive members normalized to mode 0644. Original upstream CMake retained as provenance; core-only integration adapter is separate.",
         trust="Exact Git object or HTTPS archive hash; independent signature authenticity not established",
     )

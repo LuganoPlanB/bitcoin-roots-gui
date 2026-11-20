@@ -38,6 +38,39 @@ ccache is selected when present unless explicitly disabled with
 Keep incompatible compiler, instrumentation and configuration variants in
 separate build directories.
 
+## Static SDL3 build
+
+The optional `ROOTS_GUI_SDL3=ON` build uses SDL3 for the window, input events
+and software rendering over X11. Software rendering allows the static musl
+executable to run without loading GPU driver libraries. It still needs an X11
+server, the adjacent font assets, and a system CA store for HTTPS connections.
+Desktop settings or providers that depend on loadable GIO modules may be
+unavailable in the static variant. Use the GLFW build for the existing Debug
+and AT-SPI2 test harness.
+
+The **sdl3-static** CI job uses
+[dyne/musl-action](https://github.com/dyne/musl-action) to provision the x86-64
+toolchain. To reproduce it locally, point `CC` and `CXX` at that toolchain's
+`x86_64-linux-musl-gcc` and `x86_64-linux-musl-g++` executables. Then run:
+
+```sh
+deps_work="$(realpath -m ../roots-gui-musl-deps)"
+bash .github/scripts/prepare-musl-deps.sh "$deps_work"
+export ROOTS_GUI_MUSL_DEPS="$deps_work/sysroot"
+cmake -S . -B ../roots-gui-sdl3 -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DROOTS_GUI_SDL3=ON -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/linux-musl-x86_64.cmake"
+cmake --build ../roots-gui-sdl3 --target roots-gui -j 2
+cmake --install ../roots-gui-sdl3 --prefix "$PWD/../roots-gui-sdl3-stage"
+```
+
+The preparation script stages packages from Alpine's signed v3.23 repository
+and builds the missing Xau and libeconf archives from checksum-pinned sources. The
+toolchain file keeps CMake and pkg-config searches in that dependency tree.
+CMake configuration itself is offline. The static build uses the normal
+install layout. `ROOTS_GUI_BUILD_TESTS` and `ROOTS_GUI_LINUX_PACKAGE` apply
+to the default build. The SDL3 CI job checks the installed binary's ELF
+headers and verifies rendered pixels and window-manager close under Xvfb.
+
 ## Install and runtime assets
 
 ```sh

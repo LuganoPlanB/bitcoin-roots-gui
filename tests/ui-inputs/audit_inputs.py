@@ -54,6 +54,7 @@ def main():
         "imkit/THIRD_PARTY_NOTICES.md",
         "imgui/LICENSE.txt",
         "glfw/LICENSE.md",
+        "sdl3/LICENSE.txt",
         "curl/COPYING",
         "imkit/assets/fonts/Inter-OFL.txt",
     ]:

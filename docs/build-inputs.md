@@ -12,8 +12,9 @@ the fresh offline build. This archive does not claim original executable modes.
 | Input | Exact source | Delivered/use contract |
 | --- | --- | --- |
 | ImKit 4.1.0 | `986d8d286a74fb7b2f724b9ef5d008af139aa887` | 15 core implementation units, recursive public/internal include closure, MIT notices and original upstream CMake for provenance. No Gallery/editor/show implementation. |
-| Dear ImGui docking, version 19297 | `367b2c24f399988ddafc0bb4628da0106bcc09be` | Four core units, their headers/config/STB support and matching GLFW/OpenGL3/Metal backend sources; MIT. |
+| Dear ImGui docking, version 19297 | `367b2c24f399988ddafc0bb4628da0106bcc09be` | Four core units, their headers/config/STB support and matching GLFW, OpenGL3, Metal, SDL3 and SDL_Renderer backend sources; MIT. |
 | GLFW 3.5.1 | `d9d6f0f1f967807ffade6598ea9a631ebaf37a56` | Complete source archive, zlib/libpng terms. Linux uses real X11/GLX; Wayland is disabled pending separate qualification. |
+| SDL 3.4.20 | Official archive with exact SHA256 in lock | Complete source archive under the zlib license. The optional Linux static target selects software rendering and X11. |
 | Inter 4.1 | Unmodified Regular/SemiBold and OFL from pinned ImKit tree | Host-loaded fonts; original hashes and SIL OFL retained. Noto and unrelated artwork/media are not delivered. |
 | curl 8.23.0 | Official source archive with exact SHA256 in lock | HTTP/HTTPS-only static libcurl with system OpenSSL; proxy and Basic authentication APIs retained. curl permissive license and all original source notices retained. |
 | SQLite 3.54.1 | Official amalgamation archive with exact SHA256 in lock | `sqlite3.c`, `sqlite3.h`, `sqlite3ext.h`, including public-domain dedication; independent GUI metadata library, no Core database access. Threadsafe, extension loading omitted. |

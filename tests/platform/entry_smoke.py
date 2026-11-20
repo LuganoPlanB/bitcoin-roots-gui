@@ -18,6 +18,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--check-rendered", action="store_true")
     parser.add_argument(
         "--inject-failure",
         action="store_true",
@@ -60,6 +61,13 @@ def main():
     x.XKeysymToKeycode.restype = c.c_ubyte
     x.XFlush.argtypes = [c.c_void_p]
     xt.XTestFakeKeyEvent.argtypes = [c.c_void_p, c.c_uint, c.c_int, c.c_ulong]
+    x.XGetImage.argtypes = [
+        c.c_void_p, c.c_ulong, c.c_int, c.c_int, c.c_uint, c.c_uint, c.c_ulong, c.c_int,
+    ]
+    x.XGetImage.restype = c.c_void_p
+    x.XGetPixel.argtypes = [c.c_void_p, c.c_int, c.c_int]
+    x.XGetPixel.restype = c.c_ulong
+    x.XDestroyImage.argtypes = [c.c_void_p]
     display = x.XOpenDisplay(None)
     if not display:
         raise RuntimeError("owned display unavailable")
@@ -154,6 +162,27 @@ def main():
                 check(len(extents) == 4 and extents[2] > 0, "native decorated window")
                 time.sleep(0.3)
                 check(process.poll() is None, "production host remains live")
+                if args.check_rendered:
+                    # Capture the client, excluding decorations. A mapped but
+                    # blank window must fail the SDL presentation smoke check.
+                    width, height = 800, 500
+                    deadline = time.monotonic() + 5
+                    colors = set()
+                    while len(colors) < 4 and time.monotonic() < deadline:
+                        image = x.XGetImage(display, window, 0, 0, width, height, -1, 2)
+                        if image:
+                            try:
+                                colors = {
+                                    x.XGetPixel(image, px, py)
+                                    for py in range(0, height, 4)
+                                    for px in range(0, width, 4)
+                                }
+                            finally:
+                                x.XDestroyImage(image)
+                        if len(colors) < 4:
+                            time.sleep(0.05)
+                    check(len(colors) >= 4, "rendered nonuniform GUI pixels")
+                    record["clientColorsSampled"] = len(colors)
                 if args.inject_failure:
                     check(False, "injected smoke assertion failure")
                 x.XRaiseWindow(display, window)

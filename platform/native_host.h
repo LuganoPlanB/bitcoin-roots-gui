@@ -5,6 +5,7 @@
 #include "platform/linux/accessibility.h"
 #include "platform/input.h"
 #include "platform/desktop.h"
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -12,8 +13,14 @@
 #include <span>
 #include <string>
 #include <vector>
+struct SDL_Window;
 struct GLFWwindow;
 namespace roots::gui::platform {
+#ifdef ROOTS_GUI_SDL3
+using NativeWindow = SDL_Window;
+#else
+using NativeWindow = GLFWwindow;
+#endif
 struct NativeOptions {
     int width{1200}, height{820};
     bool dark{false};
@@ -36,7 +43,7 @@ struct NativeFrame {
     int frame_left{}, frame_top{}, frame_right{}, frame_bottom{};
     int frame_extents_queries{};
     int texture_creates{}, texture_updates{}, live_textures{};
-    unsigned int font_texture{};
+    std::uint64_t font_texture{};
     unsigned int gl_error{};
     ui::BootstrapFacts draw;
     std::span<const unsigned char> rgba; // Borrowed bottom-up framebuffer; callback lifetime only.
@@ -66,7 +73,8 @@ public:
     NativeHost(const NativeHost&) = delete;
     NativeHost& operator=(const NativeHost&) = delete;
     int Run();
-    GLFWwindow* Window(); // Borrowed host-thread-only handle, never transferred.
+    NativeWindow* Window(); // Borrowed host-thread-only handle, never transferred.
+    bool Focused() const;
     void RequestClose();
     bool Minimize();
     DesktopRuntime* Desktop();

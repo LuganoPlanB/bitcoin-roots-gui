@@ -1,9 +1,9 @@
 {
   "schema": 1,
   "archive": "ui-sources.tar.gz",
-  "sha256": "616864c183124626ac4f0e92627c285caef0cd978a905f09e597fa7cd1056142",
+  "sha256": "542c0f9c1b7cd23ea1e67c940ae67c6b8b7c53b265516b8af8fa449efc526d52",
   "manifest": "ui-source-manifest.json",
-  "manifestSha256": "9ed448f8056e6a275d8f002c21d9e447e9af5799b07cb76310e3ebba07d6b7a5",
+  "manifestSha256": "895ab483c56292fefa1fc328b0df39456ff03865bebd2863c95dc04000882234",
   "imkit": {
     "version": "4.1.0",
     "revision": "986d8d286a74fb7b2f724b9ef5d008af139aa887",
@@ -37,6 +37,11 @@
     "revision": "d9d6f0f1f967807ffade6598ea9a631ebaf37a56"
   },
   "acquiredArchives": {
+    "SDL3-3.4.20.tar.gz": [
+      "sdl3",
+      "https://github.com/libsdl-org/SDL/releases/download/release-3.4.20/SDL3-3.4.20.tar.gz",
+      "f3bb06f55bed9557227a700af2ea62e49497ebdf58037732a731a5fb3ef8581f"
+    ],
     "glfw-upstream.tar.gz": [
       "glfw",
       "https://codeload.github.com/glfw/glfw/tar.gz/d9d6f0f1f967807ffade6598ea9a631ebaf37a56",
@@ -78,7 +83,10 @@
       "b695f93cd2499421ab02d22744458e650ccc88c1d4c8130d60200213abc02d58"
     ]
   },
-  "selection": "ImKit core include closure, 15 core units and Inter assets; no editor/show/Gallery units. ImGui core/matching selected backends. GLFW/curl full source archives; SQLite amalgamation; X11 headers/notices only.",
+  "sdl3": {
+    "version": "3.4.20"
+  },
+  "selection": "ImKit core include closure, 15 core units and Inter assets; no editor/show/Gallery units. ImGui core/matching selected backends. SDL3/GLFW/curl full source archives; SQLite amalgamation; X11 headers/notices only.",
   "modifications": "Source bytes unchanged; selected regular archive members normalized to mode 0644. Original upstream CMake retained as provenance; core-only integration adapter is separate.",
   "trust": "Exact Git object or HTTPS archive hash; independent signature authenticity not established"
 }

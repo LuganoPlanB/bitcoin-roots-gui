@@ -5,7 +5,7 @@ empty workspace draw entry. It shows the product name, offline status and a
 keyboard/mouse reachable Close action. Wallet opening, navigation and services
 remain later work; this screen makes no connection and starts no daemon.
 
-`NativeHost` owns GLFW, the OpenGL context, ImGui and the stock pinned GLFW and
+`NativeHost` in the default build owns GLFW, the OpenGL context, ImGui and the stock pinned GLFW and
 OpenGL3 backends on its creating thread. Only one host may exist at a time.
 The official backend installs and restores input callbacks; no synthetic
 capture flags are supplied. Initialization failures and normal/exceptional
@@ -13,6 +13,11 @@ exit use the same RAII teardown. Renderer textures are released while their
 context is current, followed by platform backend, ImGui, window and GLFW.
 Detached viewports and docking are disabled. The OS supplies title bar, move,
 resize, minimize and close controls.
+
+The optional static SDL3 build uses the same host and GUI with SDL's window,
+events and software renderer. The existing native fixtures and AT-SPI2
+automation use the default GLFW build. The SDL3 job exercises the installed
+binary on an owned X11 display. See [static build instructions](build.md#static-sdl3-build).
 
 Inter Regular/SemiBold and OFL are copied to `roots-gui-assets/fonts` beside
 the executable. Linux resolves this directory from `/proc/self/exe`, so an

@@ -39,6 +39,11 @@ function(roots_gui_add_service_dependencies source_dir)
     set(CURL_CA_NATIVE ON CACHE BOOL "Use the Windows certificate store by default")
   elseif(APPLE)
     set(USE_APPLE_SECTRUST ON)
+    # curl creates these cache entries before probing for optional libraries.
+    # Keep the bundle independent of Homebrew runtime libraries.
+    set(CURL_BROTLI OFF CACHE STRING "Build curl with Brotli support" FORCE)
+    set(CURL_ZSTD OFF CACHE STRING "Build curl with Zstd support" FORCE)
+    set(USE_LIBIDN2 OFF CACHE BOOL "Use libidn2 for IDN support" FORCE)
   endif()
   foreach(feature CURL_ZLIB CURL_BROTLI CURL_ZSTD USE_NGHTTP2 CURL_USE_LIBPSL
       CURL_USE_LIBSSH2 CURL_USE_LIBSSH CURL_USE_GSSAPI CURL_USE_LIBIDN2)

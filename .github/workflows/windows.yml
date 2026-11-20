@@ -68,8 +68,19 @@ jobs:
           cp /ucrt64/bin/opengl32.dll "$build/"
           GALLIUM_DRIVER=llvmpipe timeout 30s "$build/roots_gui_windows_input.exe" --owned-desktop
           python -B tests/windows/entry.py "$stage" "$(cygpath -m /ucrt64/bin)"
-          archive="$(cygpath -m "$RUNNER_TEMP")/bitcoin-roots-gui-windows-x86_64"
-          python -B -c 'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", sys.argv[2])' "$archive" "$stage"
+          archive="$(cygpath -m "$RUNNER_TEMP")/bitcoin-roots-gui-windows-x86_64.zip"
+          python -B - "$archive" "$stage" <<'PY'
+          import sys
+          from pathlib import Path
+          from zipfile import ZIP_DEFLATED, ZipFile
+
+          stage = Path(sys.argv[2])
+          # Packaged dependencies may use a reproducible Unix epoch mtime.
+          with ZipFile(sys.argv[1], "w", compression=ZIP_DEFLATED, strict_timestamps=False) as archive:
+              for path in sorted(stage.rglob("*")):
+                  if path.is_file():
+                      archive.write(path, path.relative_to(stage))
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: bitcoin-roots-gui-windows-x86_64

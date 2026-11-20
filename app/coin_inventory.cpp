@@ -3,8 +3,10 @@
 #include "app/coin_inventory.h"
 #include <algorithm>
 #include <charconv>
+#if !defined(_WIN32)
 #include <fcntl.h>
 #include <unistd.h>
+#endif
 namespace roots::gui::app {
 std::string CoinKey(const Outpoint& p){return p.txid.hex()+":"+std::to_string(p.index);}
 std::optional<Outpoint> ParseCoinKey(std::string_view key){if(key.size()<66 || key.size()>75 || key[64]!=':')return {};auto h=Hash256::Parse(key.substr(0,64));uint32_t n{};auto p=std::from_chars(key.data()+65,key.data()+key.size(),n);if(!h || h->hex()!=key.substr(0,64) || p.ec!=std::errc{} || p.ptr!=key.data()+key.size() || std::to_string(n)!=key.substr(65))return {};return Outpoint{*h,n};}
@@ -66,5 +68,13 @@ std::vector<const CoinRow*> CoinInventory::Ordered(bool by_value,bool descending
 }
 std::optional<std::vector<CoinGroup>> CoinInventory::Chart() const {if(!complete_inventory)return {};std::vector<const CoinRow*> order;for(const auto& [key,row]:rows)if(row.present)order.push_back(&row);std::sort(order.begin(),order.end(),[](auto a,auto b){return a->value!=b->value?a->value>b->value:CoinKey(a->outpoint)<CoinKey(b->outpoint);});std::vector<CoinGroup> out;for(size_t i=0;i<order.size();++i){const auto key=CoinKey(order[i]->outpoint);if(i<9)out.push_back({"#"+std::to_string(i+1),order[i]->value,{key}});else if(i==9)out.push_back({"Other",order[i]->value,{key}});else{auto sum=out.back().value.Add(order[i]->value);if(!sum)return {};out.back().value=*sum;out.back().keys.push_back(key);}}return out;}
 std::optional<std::string> CoinCsv(const CoinInventory& inventory,std::span<const CoinRow* const> rows,const std::map<std::string,std::string>& labels,bool hidden){if(hidden || rows.size()>8192)return {};std::string csv="Date (UTC),Output,Address,Label,Value (BTC),Observed (ms UTC),Current,Reason,Heuristics\r\n";for(const auto* row:rows){if(!row)return {};const auto key=CoinKey(row->outpoint);const auto i=inventory.Rows().find(key);if(i==inventory.Rows().end() || &i->second!=row)return {};const auto label=labels.contains(key)?labels.at(key):row->label;if(!Text(label) || !Text(row->address))return {};csv+=Cell(row->date?HistoryDate(*row->date,true):"Unknown")+','+Cell(key)+','+Cell(row->address)+','+Cell(label)+','+Cell(row->value.btc(),true)+','+Cell(std::to_string(row->observed),true)+','+Cell(row->current?"Current wallet observation":"Unknown; dated")+','+Cell(row->reason)+','+Cell(std::string(row->reused?"Address reuse heuristic; ":"")+(row->small_value?"Small-value heuristic (<546 sats); not relay policy":""))+"\r\n";if(csv.size()>8*1024*1024)return {};}return csv;}
+#if !defined(_WIN32)
 bool WriteCoinCsv(const std::string& path,const std::string& data,std::string& error){const std::filesystem::path target(path);if(!target.is_absolute() || data.empty()){error="Choose an absolute path for a new CSV file.";return false;}const int fd=::open(path.c_str(),O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);if(fd<0){error="CSV was not saved. Choose a new filename; existing files are retained.";return false;}size_t offset{};bool ok=true;while(offset<data.size()){const auto n=::write(fd,data.data()+offset,data.size()-offset);if(n<0 && errno==EINTR)continue;if(n<=0){ok=false;break;}offset+=size_t(n);}if(::fsync(fd)!=0)ok=false;if(::close(fd)!=0)ok=false;if(!ok){error="CSV write failed; partial file may remain. Choose a new filename to retry.";return false;}const int dir=::open(target.parent_path().c_str(),O_RDONLY|O_DIRECTORY|O_CLOEXEC);const bool durable=dir>=0 && ::fsync(dir)==0;if(dir>=0)::close(dir);error=durable?"CSV saved locally.":"CSV written; directory durability unconfirmed. Check the selected file.";return durable;}
+#else
+bool WriteCoinCsv(const std::string&, const std::string&, std::string& error)
+{
+    error = "Local CSV export is unavailable on Windows.";
+    return false;
+}
+#endif
 }

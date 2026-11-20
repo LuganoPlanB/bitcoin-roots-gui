@@ -19,17 +19,17 @@ events and software renderer. The existing native fixtures and AT-SPI2
 automation use the default GLFW build. The SDL3 job exercises the installed
 binary on an owned X11 display. See [static build instructions](build.md#static-sdl3-build).
 
-Inter Regular/SemiBold and OFL are copied to `roots-gui-assets/fonts` beside
-the executable. Linux resolves this directory from `/proc/self/exe`, so an
-unrelated working directory is supported. Missing assets fail initialization
-with a diagnostic. Font bytes belong to the atlas; no borrowed temporary font
-buffer survives loading. ImGui's dynamic atlas owns texture updates. Device
-object recreation uses the stock renderer API and the next frame recreates
-the font texture.
+The body uses ImGui's embedded ProggyForever at 16 px before scaling.
+Inter Regular supplies missing glyphs, and Inter SemiBold supplies headings.
+Both Inter files and their license ship in `roots-gui-assets/fonts`. Linux
+resolves that directory from `/proc/self/exe`. Missing assets fail initialization
+with a diagnostic. ImGui's dynamic atlas owns the font data and texture updates.
 
-GLFW supplies content scale each frame. Fresh theme tokens are derived from
-user font scale times content scale; layout and explicit font sizes scale once.
-Repeated application cannot compound style scaling. Minimum logical client
+The UI combines the Interface size preference with the current display scale.
+Linux X11 uses a valid `Xft.dpi` setting when present and otherwise uses the
+backend's reported scale. Windows uses GLFW's window content scale. Unavailable
+or invalid scale falls back to 100%. macOS uses Cocoa logical points for layout
+and applies Retina backing density in the renderer. Minimum logical client
 size is 960×640, scaled for the current DPI. Minimized or zero-sized clients
 wait for events without rendering; restoration resumes the same host. Pinned
 ImGui quantizes fractional font sizes to the nearest integer raster size.

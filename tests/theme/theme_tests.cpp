@@ -96,7 +96,7 @@ int main(int argc,char** argv)
     ImGui_ImplNull_NewFrame(); ImGui::NewFrame();
     for (float scale : {1.F,1.5F,2.F,1.F,2.F,1.5F,1.F}) {
         const auto theme=Make(false,scale); Apply(theme);
-        Check(theme.typography.body==14*scale && theme.metrics.controlHeight==32*scale,"DPI rebuild exact and noncumulative");
+        Check(theme.typography.body==16*scale && theme.metrics.controlHeight==32*scale,"DPI rebuild exact and noncumulative");
         Check(Equal(ImGui::GetStyle().Colors[ImGuiCol_Border],Wallet(false).boundary),"actual projected boundary opaque");
         const auto before=ImGui::GetStyle();
         { Scope first(Make(true,2)); const auto middle=ImGui::GetStyle();

@@ -64,7 +64,7 @@ BootstrapFacts DrawBootstrap(const imkit::Theme& theme, const BootstrapAppearanc
 }
 std::string BuildInfo()
 {
-    const auto theme = imkit::MakePrecisionTheme(imkit::ColorScheme::Dark);
-    return "\"imgui\":" + std::to_string(IMGUI_VERSION_NUM) + ",\"imkit\":\"" IMKIT_VERSION "\",\"body_size\":" + std::to_string(theme.metrics.bodySize);
+    const auto applied = theme::Make(true);
+    return "\"imgui\":" + std::to_string(IMGUI_VERSION_NUM) + ",\"imkit\":\"" IMKIT_VERSION "\",\"body_size\":" + std::to_string(applied.metrics.bodySize);
 }
 }

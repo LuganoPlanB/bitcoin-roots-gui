@@ -44,7 +44,7 @@ struct Observer final : platform::NativeObserver {
         Check(facts.save_visible && facts.cancel_visible,"Save and Cancel visible");
         for (const auto& rect : {facts.save,facts.cancel})
             Check(rect[0]>=0 && rect[1]>=0 && rect[2]<=f.width && rect[3]<=f.height,"primary actions reachable");
-        Check(std::fabs(facts.font_size-std::round(14*f.effective_scale))<.05F,"single font/DPI scale");
+        Check(std::fabs(facts.font_size-std::round(16*f.effective_scale))<.05F,"single font/DPI scale");
         Check(!f.gl_error && f.font_texture && f.live_textures>0,"real renderer resources");
         std::ofstream image(out/(name+".ppm"),std::ios::binary);
         image<<"P6\n"<<f.framebuffer_width<<' '<<f.framebuffer_height<<"\n255\n";

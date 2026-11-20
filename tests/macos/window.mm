@@ -17,6 +17,8 @@ struct SmokeObserver : NativeObserver {
     {
         if (frame.framebuffer_width <= 0 || frame.framebuffer_height <= 0 || !frame.live_textures)
             throw std::runtime_error("Metal frame has no drawable or font texture");
+        if (frame.draw.font_size != 16.F || frame.effective_scale != 1.F)
+            throw std::runtime_error("Expected 16-point body text with independent Retina backing scale");
         if (++frames == 3) host.RequestClose();
     }
 

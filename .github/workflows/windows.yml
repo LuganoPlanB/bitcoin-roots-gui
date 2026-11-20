@@ -68,8 +68,11 @@ jobs:
           cp /ucrt64/bin/opengl32.dll "$build/"
           GALLIUM_DRIVER=llvmpipe timeout 30s "$build/roots_gui_windows_input.exe" --owned-desktop
           python -B tests/windows/entry.py "$stage" "$(cygpath -m /ucrt64/bin)"
+          archive="$(cygpath -m "$RUNNER_TEMP")/bitcoin-roots-gui-windows-x86_64"
+          python -B -c 'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", sys.argv[2])' "$archive" "$stage"
       - uses: actions/upload-artifact@v4
         with:
-          name: roots-gui-windows-x86_64
-          path: ${{ runner.temp }}/roots-windows-stage/
+          name: bitcoin-roots-gui-windows-x86_64
+          path: ${{ runner.temp }}/bitcoin-roots-gui-windows-x86_64.zip
+          overwrite: true
           if-no-files-found: error

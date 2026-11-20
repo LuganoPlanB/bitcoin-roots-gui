@@ -83,6 +83,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: bitcoin-roots-gui-macos-arm64
+          overwrite: true
           path: |
             ${{ runner.temp }}/bitcoin-roots-gui-macos-arm64.zip
             ${{ runner.temp }}/macos-linkage.txt

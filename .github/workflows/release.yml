@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: 'Publish the calculated source release (false previews only)'
+        description: 'Publish the calculated release and desktop binaries (false previews only)'
         required: true
         type: boolean
         default: false
@@ -24,13 +24,14 @@ jobs:
     outputs:
       version: ${{ steps.plan.outputs.version }}
       ready: ${{ steps.plan.outputs.ready }}
+      builds: ${{ steps.base.outputs.builds }}
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Check candidate CI and select release base
+      - name: Check candidate CI, binary packages, and release base
         id: base
         uses: actions/github-script@v8
         with:
@@ -53,18 +54,20 @@ jobs:
           RELEASE_BASE: ${{ steps.base.outputs.base }}
           RELEASE_BASE_SHA: ${{ steps.base.outputs.base_sha }}
           RELEASE_NEXT: ${{ steps.semver.outputs.next }}
+          RELEASE_BUILDS: ${{ steps.base.outputs.builds }}
           RELEASE_PUBLISH: ${{ inputs.publish }}
         with:
           script: |
             await require('./.github/scripts/release.cjs').finalize({context, core,
               base: process.env.RELEASE_BASE, baseSha: process.env.RELEASE_BASE_SHA,
-              next: process.env.RELEASE_NEXT, publish: process.env.RELEASE_PUBLISH === 'true'});
+              next: process.env.RELEASE_NEXT, publish: process.env.RELEASE_PUBLISH === 'true',
+              builds: JSON.parse(process.env.RELEASE_BUILDS)});
 
   publish:
     needs: version
     if: inputs.publish && needs.version.outputs.ready == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       contents: write
       actions: read
@@ -73,11 +76,35 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Publish tested source commit
+      - name: Download the tested Linux Musl package
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ fromJSON(needs.version.outputs.builds).linux.run }}
+          artifact-ids: ${{ fromJSON(needs.version.outputs.builds).linux.artifact }}
+          path: ${{ runner.temp }}/release-assets/linux
+      - name: Download the tested Windows package
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ fromJSON(needs.version.outputs.builds).windows.run }}
+          artifact-ids: ${{ fromJSON(needs.version.outputs.builds).windows.artifact }}
+          path: ${{ runner.temp }}/release-assets/windows
+      - name: Download the tested macOS ARM64 package
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ fromJSON(needs.version.outputs.builds).macos.run }}
+          artifact-ids: ${{ fromJSON(needs.version.outputs.builds).macos.artifact }}
+          path: ${{ runner.temp }}/release-assets/macos
+      - name: Publish the tested commit and verified desktop packages
         uses: actions/github-script@v8
         env:
           RELEASE_VERSION: ${{ needs.version.outputs.version }}
+          RELEASE_BUILDS: ${{ needs.version.outputs.builds }}
+          RELEASE_ASSET_ROOT: ${{ runner.temp }}/release-assets
         with:
           script: |
             await require('./.github/scripts/release.cjs').publish({github, context, core,
-              version: process.env.RELEASE_VERSION});
+              version: process.env.RELEASE_VERSION, builds: JSON.parse(process.env.RELEASE_BUILDS),
+              assetRoot: process.env.RELEASE_ASSET_ROOT});

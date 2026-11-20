@@ -28,10 +28,18 @@ jobs:
           set -euo pipefail
           test "$(uname -m)" = arm64
           xcodebuild -version
-          brew install cmake ninja pkgconf openssl@3 libsodium
+          brew install cmake ninja pkgconf openssl@3 libsodium ccache
+      - uses: actions/cache/restore@v4
+        id: compiler-cache
+        with:
+          path: ${{ runner.temp }}/roots-macos-ccache
+          key: roots-macos-arm64-xcode26.3-${{ github.sha }}
+          restore-keys: roots-macos-arm64-xcode26.3-
       - name: Build and check the macOS bundle
         run: |
           set -euo pipefail
+          export CCACHE_DIR="$RUNNER_TEMP/roots-macos-ccache"
+          export CCACHE_MAXSIZE=200M
           build="$RUNNER_TEMP/roots-gui-macos"
           stage="$RUNNER_TEMP/roots-gui-macos-stage"
           openssl="$(brew --prefix openssl@3)"
@@ -67,6 +75,11 @@ jobs:
           d = json.load(sys.stdin)
           assert d["renderer"] == "Metal" and d["backend_symbols_linked"] and not d["native_initialized"], d
           '
+      - uses: actions/cache/save@v4
+        if: always() && steps.compiler-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}/roots-macos-ccache
+          key: roots-macos-arm64-xcode26.3-${{ github.sha }}
       - uses: actions/upload-artifact@v4
         with:
           name: bitcoin-roots-gui-macos-arm64

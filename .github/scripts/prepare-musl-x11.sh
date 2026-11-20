@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stage build-only x86-64 Alpine archives outside the source tree.
+# Stage the X11 archives missing from Dyne musl v2.7.0.
 set -euo pipefail
 
 work=$(realpath -m "${1:?pass a scratch directory outside the source tree}")
@@ -36,35 +36,21 @@ printf '%s/main\n' "$mirror" > repositories
   --library-path "$work/bootstrap/lib:$work/bootstrap/usr/lib" "$work/bootstrap/sbin/apk" \
   --root "$work/sysroot" --initdb --keys-dir "$work/bootstrap/etc/apk/keys" \
   --repositories-file "$work/repositories" --no-scripts --no-chown --no-cache add \
-  glib-dev glib-static libx11-dev libx11-static libxext-dev libxext-static libxcb-static \
-  openssl-dev openssl-libs-static libsodium-dev libsodium-static pcre2-static \
-  zlib-static libffi-dev gettext-static bzip2-static util-linux-static
+  libx11-dev libx11-static libxext-dev libxext-static libxcb-static
 
 # Alpine's libxau-dev ships headers and pkg-config metadata but no archive.
 fetch https://www.x.org/releases/individual/lib/libXau-1.0.12.tar.xz \
   74d0e4dfa3d39ad8939e99bda37f5967aba528211076828464d2777d477fc0fb
 tar --extract --xz --file libXau-1.0.12.tar.xz
 cd libXau-1.0.12
+# Relocate metadata per package so CMake can search this overlay and the
+# toolchain's dependency prefix together.
+for pc in "$work/sysroot/usr/"{lib,share}/pkgconfig/*.pc; do
+  [[ -f "$pc" ]] || continue
+  sed -i 's@^prefix=/usr$@prefix=${pcfiledir}/../..@' "$pc"
+done
 export PKG_CONFIG_LIBDIR="$work/sysroot/usr/lib/pkgconfig:$work/sysroot/usr/share/pkgconfig"
-export PKG_CONFIG_SYSROOT_DIR="$work/sysroot"
-unset PKG_CONFIG_PATH
+unset PKG_CONFIG_PATH PKG_CONFIG_SYSROOT_DIR
 LDFLAGS=-static ./configure --host=x86_64-linux-musl --prefix=/usr --disable-shared --enable-static
 make -j2
 install -m 0644 .libs/libXau.a "$work/sysroot/usr/lib/"
-
-# Alpine's static libmount references libeconf, but mount.pc omits it and
-# Alpine ships libeconf only as a shared library. Supply this private archive.
-cd "$work"
-fetch https://codeload.github.com/openSUSE/libeconf/tar.gz/refs/tags/v0.8.3 \
-  c8855f08d64c06b57a5028a14eec6ddde5e35124f9718031d592b44d8e091f83 libeconf-0.8.3.tar.gz
-tar --extract --gzip --file libeconf-0.8.3.tar.gz
-cmake -S libeconf-0.8.3 -B econf-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib -DBUILD_SHARED_LIBS=OFF \
-  -DCMAKE_EXE_LINKER_FLAGS=-static
-cmake --build econf-build --target econf -j2
-install -m 0644 econf-build/lib/libeconf.a "$work/sysroot/usr/lib/"
-install -m 0644 econf-build/libeconf.pc "$work/sysroot/usr/lib/pkgconfig/"
-mount_pc="$work/sysroot/usr/lib/pkgconfig/mount.pc"
-if ! grep -Eq '^Requires\.private:.*\blibeconf\b' "$mount_pc"; then
-  sed -i '/^Requires\.private:/ s/$/ libeconf/' "$mount_pc"
-fi

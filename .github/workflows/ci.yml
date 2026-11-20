@@ -76,6 +76,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: standalone-gui-results
+          overwrite: true
           path: |
             ${{ runner.temp }}/gui-configure.log
             ${{ runner.temp }}/gui-models.log
@@ -129,11 +130,24 @@ jobs:
           python3 -B tests/platform/owned_display.py --output "$RUNNER_TEMP/sdl3-display" -- \
             python3 -B tests/platform/entry_smoke.py --binary "$binary" --check-rendered \
               --output "$RUNNER_TEMP/sdl3-entry"
+          sdk="$(realpath "$(dirname "$CC")/../../x86_64-linux-musl")"
+          for dependency in glib libffi libsodium pcre2; do
+            cp -r "$sdk/share/licenses/$dependency" "$STAGE_DIR/share/doc/roots-gui/licenses/"
+          done
+          tar -czf "$RUNNER_TEMP/bitcoin-roots-gui-linux-musl-x86_64.tar.gz" -C "$STAGE_DIR" .
+      - name: Upload the Linux Musl release package
+        uses: actions/upload-artifact@v4
+        with:
+          name: bitcoin-roots-gui-linux-musl-x86_64
+          path: ${{ runner.temp }}/bitcoin-roots-gui-linux-musl-x86_64.tar.gz
+          if-no-files-found: error
+          overwrite: true
       - name: Retain static build and launch evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sdl3-static-evidence
+          overwrite: true
           path: |
             ${{ runner.temp }}/musl-x11.log
             ${{ runner.temp }}/sdl3-configure.log

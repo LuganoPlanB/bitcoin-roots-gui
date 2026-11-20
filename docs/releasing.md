@@ -1,9 +1,9 @@
-# Source releases
+# Desktop releases
 
-Run the **Release** workflow from GitHub Actions on `main`, after its
-**Standalone GUI** push CI completes successfully. Leave **publish** unchecked
-to preview the version in the job summary. Check it to create the tag and
-GitHub Release with generated release notes. The equivalent CLI commands are:
+Run the **Release** workflow from GitHub Actions on `main` after the
+**Standalone GUI**, **Native Windows GUI**, and **Apple Silicon GUI** push
+workflows succeed. Leave **publish** unchecked to preview the version and the
+three selected build runs in the job summary. Check it to publish the release.
 
 ```sh
 gh workflow run release.yml --ref main -f publish=false
@@ -11,35 +11,49 @@ gh workflow run release.yml --ref main -f publish=false
 gh workflow run release.yml --ref main -f publish=true
 ```
 
-Each run binds the version calculation and tag to its exact `main` commit.
-Publication rechecks that this commit is still the branch tip and that its
-latest push CI succeeded. If `main` advances, run the workflow again after CI.
-No release runs automatically on push, pull requests, or preview dispatches.
+GitHub generates source archives for the tag. The workflow also attaches
+these packages and a `SHA256SUMS` file that covers all three.
 
-The first source release is `v0.1.0`. Subsequent releases use
+| Download | Contents |
+| --- | --- |
+| `bitcoin-roots-gui-linux-musl-x86_64.tar.gz` | Static SDL3/X11 build with fonts and dependency notices. Extract and run `bin/roots-gui`. |
+| `bitcoin-roots-gui-windows-x86_64.zip` | Native x64 package with runtime DLLs, fonts, and notices. Extract and run `bin/roots-gui.exe`. |
+| `bitcoin-roots-gui-macos-arm64.zip` | Ad hoc signed `Bitcoin Roots.app` for Apple Silicon on macOS 15 or later, with dependency notices. |
+
+Each run binds version calculation, packages, and tagging to its exact
+`main` commit. Package selection uses the latest successful result and
+artifact IDs from each platform's latest push run for that commit.
+Publication checks these IDs and the branch tip again after uploading.
+If a package expired, rerun its build workflow for the same commit. If
+`main` advances, dispatch again after the new commit's CI succeeds.
+
+The workflow stages assets on a draft and publishes it after GitHub reports
+the expected size and SHA-256 for each upload. If an upload is interrupted,
+a rerun can resume the workflow's draft when its commit, selected artifacts,
+and previously uploaded bytes still match. Conflicting tags, drafts, and
+assets stop for manual inspection. A matching published release is a no-op.
+Releases run only through an explicit publish dispatch.
+
+The first release is `v0.1.0`. Subsequent releases use
 [`ietf-tools/semver-action`](https://github.com/ietf-tools/semver-action), pinned
-to v1.12.0's immutable commit, starting from the highest stable `vMAJOR.MINOR.PATCH`
-tag reachable from the candidate. Tags outside that history and prerelease
-tags are ignored. Use conventional commit messages:
+to v1.12.0's immutable commit, starting from the highest stable
+`vMAJOR.MINOR.PATCH` tag reachable from the candidate. Tags outside that history
+and prerelease tags are ignored. Use conventional commit messages:
 
 - `feat:` or `feature:` increments the minor version.
 - `fix:`, `bugfix:`, `perf:`, `refactor:`, `test:` or `tests:` increments patch.
 - A conventional breaking change (`feat!:` or a `BREAKING CHANGE:` footer)
   increments major, including before 1.0.
-- Docs/chore-only history without a breaking change creates no new release.
+- Docs/chore-only changes without a breaking change create no new release.
 
-A rerun never moves an existing tag. A matching tag left by an interrupted run
-can finish creating its release; a matching published release is a no-op.
-A conflicting tag or existing draft/prerelease stops for manual inspection.
+The Linux release build uses the pinned
+[Dyne Musl toolchain source](https://github.com/dyne/musl/tree/v2.7.0)
+and the X11 and SDL3 build instructions in the [build guide](build.md#static-sdl3-build).
+The workflow creates lightweight tags. Maintainer commit signing remains
+required. The preview job has read-only access, and only the explicit
+publication job can write release refs and assets.
 
-These are **source releases**, with GitHub's generated source archives. They do
-not upload desktop binaries, change the inherited diagnostic version string,
-or provide cryptographic release attestations. Tags created by the workflow
-are lightweight tags. Maintainer commit signing remains required; no private
-signing key or personal access token is stored in Actions. The version job has
-read-only access; only the explicit publication job can write release refs.
-
-Release policy tests need Node.js 24 (application builds do not):
+Release policy tests need Node.js 24 (application builds do not).
 
 ```sh
 node --test tests/release/release.test.cjs

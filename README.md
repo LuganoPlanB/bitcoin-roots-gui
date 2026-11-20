@@ -89,8 +89,8 @@ node-backed tests; never point them at a personal wallet or live network.
 ## Releases
 
 The [Release workflow](https://github.com/LuganoPlanB/bitcoin-roots-gui/actions/workflows/release.yml)
-previews a semantic version and optionally publishes a source release from a
-tested `main` commit. See [release instructions](docs/releasing.md).
+previews a semantic version and publishes source and desktop packages from a
+tested `main` commit when requested. See [release instructions](docs/releasing.md).
 
 ## Contribute
 

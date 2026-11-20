@@ -1,3 +1,6 @@
 # Preserve exact bytes of pinned source inputs and upstream QR sources.
 third_party/*.tar.gz -text -diff
+third_party/*manifest.json -text
+third_party/patches/** -text
+third_party/licenses/** -text
 third_party/qr/** -text -whitespace linguist-vendored=true

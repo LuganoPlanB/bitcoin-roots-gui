@@ -6,6 +6,10 @@
 #include <condition_variable>
 #include <iostream>
 #include <thread>
+#ifdef _WIN32
+#include <filesystem>
+#include <vector>
+#endif
 
 using namespace roots::gui;
 namespace {
@@ -23,7 +27,7 @@ public:
     }
 };
 }
-int main(int argc, char** argv)
+static int Run(int argc, char** argv)
 {
     if (argc != 11) return 2;
     ConnectionProfile p;
@@ -67,4 +71,21 @@ int main(int argc, char** argv)
         }
     }
     std::cout << "}\n";
+    return 0;
 }
+#ifdef _WIN32
+int wmain(int argc, wchar_t** argv)
+{
+    std::vector<std::string> utf8;
+    utf8.reserve(argc);
+    for (int i = 0; i < argc; ++i) {
+        const auto value = std::filesystem::path(argv[i]).u8string();
+        utf8.emplace_back(value.begin(), value.end());
+    }
+    std::vector<char*> pointers;
+    for (auto& value : utf8) pointers.push_back(value.data());
+    return Run(argc, pointers.data());
+}
+#else
+int main(int argc, char** argv) { return Run(argc, argv); }
+#endif

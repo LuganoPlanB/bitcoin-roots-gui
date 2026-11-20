@@ -1,6 +1,18 @@
 # Standard standalone install: binary, runtime fonts and dependency notices.
 include(GNUInstallDirs)
-install(TARGETS roots-gui RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+if(WIN32)
+  get_filename_component(roots_gui_runtime_dir "${CMAKE_CXX_COMPILER}" DIRECTORY)
+  set(ROOTS_GUI_WINDOWS_RUNTIME_DIR "${roots_gui_runtime_dir}" CACHE PATH "Windows compiler and dependency DLL directory")
+  install(TARGETS roots-gui RUNTIME_DEPENDENCY_SET roots_gui_windows_dlls
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+  install(RUNTIME_DEPENDENCY_SET roots_gui_windows_dlls
+    DIRECTORIES "${ROOTS_GUI_WINDOWS_RUNTIME_DIR}"
+    PRE_EXCLUDE_REGEXES "^api-ms-" "^ext-ms-"
+    POST_EXCLUDE_REGEXES "[/\\\\][Ww][Ii][Nn][Dd][Oo][Ww][Ss][/\\\\]"
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+else()
+  install(TARGETS roots-gui RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+endif()
 install(FILES
   "${roots_gui_ui_source}/imkit/assets/fonts/Inter-Regular.ttf"
   "${roots_gui_ui_source}/imkit/assets/fonts/Inter-SemiBold.ttf"

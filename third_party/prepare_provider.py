@@ -5,6 +5,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 import posixpath
 import shutil
@@ -14,7 +15,9 @@ import tarfile
 
 def unpack(archive, destination):
     with tarfile.open(archive) as source:
-        for item in source.getmembers():
+        members = source.getmembers()
+        entries = {item.name: item for item in members}
+        for item in members:
             path = PurePosixPath(item.name)
             if path.is_absolute() or ".." in path.parts or not path.parts:
                 raise RuntimeError("unsafe source archive path")
@@ -30,6 +33,16 @@ def unpack(archive, destination):
                     or target.parts[0] != path.parts[0]
                 ):
                     raise RuntimeError("source archive link escapes input root")
+                if os.name == "nt":
+                    # These pinned links point at common license texts. Windows
+                    # builds may run without symlink creation privileges.
+                    original = entries.get(str(target))
+                    if path.name != "LICENSE" or not original or not original.isfile():
+                        raise RuntimeError("unsupported Windows archive link")
+                    item.type = tarfile.REGTYPE
+                    item.size = original.size
+                    item.offset_data = original.offset_data
+                    item.linkname = ""
         if hasattr(tarfile, "data_filter"):
             source.extractall(destination, filter="data")
         else:  # Python 3.10: paths/types/links were checked before any writes.

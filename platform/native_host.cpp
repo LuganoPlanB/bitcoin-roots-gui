@@ -32,6 +32,9 @@
 #include <vector>
 #include <cstring>
 #include <utility>
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
 namespace roots::gui::platform {
 namespace {
@@ -48,6 +51,12 @@ std::filesystem::path ExecutableFontDirectory()
 {
 #if defined(__linux__)
     return std::filesystem::read_symlink("/proc/self/exe").parent_path() / "roots-gui-assets/fonts";
+#elif defined(_WIN32)
+    std::wstring executable(32768, L'\0');
+    const auto length = GetModuleFileNameW(nullptr, executable.data(), static_cast<DWORD>(executable.size()));
+    if (!length || length >= executable.size()) throw std::runtime_error("could not locate the Windows executable");
+    executable.resize(length);
+    return std::filesystem::path(executable).parent_path() / "roots-gui-assets/fonts";
 #else
     throw std::runtime_error("native asset location is not yet qualified on this platform");
 #endif
@@ -172,8 +181,12 @@ struct NativeHost::Impl {
         for (const auto* file : {"Inter-Regular.ttf", "Inter-SemiBold.ttf"}) {
             if (!std::filesystem::is_regular_file(options.font_directory/file)) throw std::runtime_error("required Inter font asset is missing");
         }
-        regular = io.Fonts->AddFontFromFileTTF((options.font_directory/"Inter-Regular.ttf").string().c_str(), 14);
-        emphasis = io.Fonts->AddFontFromFileTTF((options.font_directory/"Inter-SemiBold.ttf").string().c_str(), 20);
+        const auto font_path = [this](const char* name) {
+            const auto utf8 = (options.font_directory / name).u8string();
+            return std::string(utf8.begin(), utf8.end());
+        };
+        regular = io.Fonts->AddFontFromFileTTF(font_path("Inter-Regular.ttf").c_str(), 14);
+        emphasis = io.Fonts->AddFontFromFileTTF(font_path("Inter-SemiBold.ttf").c_str(), 20);
         if (!regular || !emphasis) throw std::runtime_error("required licensed Inter fonts could not be loaded");
         monospace=io.Fonts->AddFontDefaultVector(); // Embedded MIT ProggyForever; atlas-owned technical face.
         if (!monospace) throw std::runtime_error("required embedded monospace font could not be loaded");

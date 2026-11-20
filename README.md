@@ -61,6 +61,8 @@ musl dependency tree and the Dyne musl toolchain as shown in the
 [static build instructions](docs/build.md#static-sdl3-build). Keep GLFW for
 Debug developer builds and the AT-SPI2 automation.
 
+For native Windows x64 builds and the CI package, see [Windows build and integration](docs/windows-build.md).
+
 ## Test
 
 Use a separate developer build and the bounded model suite:

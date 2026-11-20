@@ -411,7 +411,7 @@ struct TransactionEditor {
     uint64_t generation{};
     protocol::InspectionNode node{protocol::InspectionNode::Overview};
     size_t index{};
-    components::Edit version,locktime,outpoint,sequence,amount;
+    components::Edit version{}, locktime{}, outpoint{}, sequence{}, amount{};
     std::vector<char> destination;
     std::string saved_destination;
     std::optional<std::string> external_destination;

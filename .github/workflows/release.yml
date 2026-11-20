@@ -76,12 +76,14 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+      # Downloads by ID otherwise add a subdirectory named after the artifact.
       - name: Download the tested Linux Musl package
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ github.token }}
           run-id: ${{ fromJSON(needs.version.outputs.builds).linux.run }}
           artifact-ids: ${{ fromJSON(needs.version.outputs.builds).linux.artifact }}
+          merge-multiple: true
           path: ${{ runner.temp }}/release-assets/linux
       - name: Download the tested Windows package
         uses: actions/download-artifact@v4
@@ -89,6 +91,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ fromJSON(needs.version.outputs.builds).windows.run }}
           artifact-ids: ${{ fromJSON(needs.version.outputs.builds).windows.artifact }}
+          merge-multiple: true
           path: ${{ runner.temp }}/release-assets/windows
       - name: Download the tested macOS ARM64 package
         uses: actions/download-artifact@v4
@@ -96,6 +99,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ fromJSON(needs.version.outputs.builds).macos.run }}
           artifact-ids: ${{ fromJSON(needs.version.outputs.builds).macos.artifact }}
+          merge-multiple: true
           path: ${{ runner.temp }}/release-assets/macos
       - name: Publish the tested commit and verified desktop packages
         uses: actions/github-script@v8

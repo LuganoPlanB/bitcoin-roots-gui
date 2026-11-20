@@ -19,6 +19,10 @@
       {
         "path": "patches/libwally-1.6.1-psbt-conformance.patch",
         "sha256": "b9ee0a35dbfe72ab6144ec05dc9ea38035191f62262668b82b71bce4294ad1d5"
+      },
+      {
+        "path": "patches/libwally-1.6.1-mingw-ssize.patch",
+        "sha256": "8ff23d180555edd0129a1113739a0c2001b356a9904a2b1c391a4e0e47610760"
       }
     ]
   },

@@ -93,7 +93,10 @@ def main():
             }
         )
     vectors = pack(root / "bips-provider-vectors.tar.gz", entries)
-    patch = root / "patches/libwally-1.6.1-psbt-conformance.patch"
+    patches = [
+        root / "patches/libwally-1.6.1-psbt-conformance.patch",
+        root / "patches/libwally-1.6.1-mingw-ssize.patch",
+    ]
     lock = {
         "schema": 1,
         "normal_build_network": "forbidden",
@@ -110,9 +113,10 @@ def main():
             },
             "patches": [
                 {
-                    "path": str(patch.relative_to(root)),
+                    "path": patch.relative_to(root).as_posix(),
                     "sha256": hashlib.sha256(patch.read_bytes()).hexdigest(),
                 }
+                for patch in patches
             ],
         },
         "bips_vectors": {

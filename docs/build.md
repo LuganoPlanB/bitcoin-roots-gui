@@ -48,28 +48,34 @@ Desktop settings or providers that depend on loadable GIO modules may be
 unavailable in the static variant. Use the GLFW build for the existing Debug
 and AT-SPI2 test harness.
 
-The **sdl3-static** CI job uses
-[dyne/musl-action](https://github.com/dyne/musl-action) to provision the x86-64
-toolchain. To reproduce it locally, point `CC` and `CXX` at that toolchain's
-`x86_64-linux-musl-gcc` and `x86_64-linux-musl-g++` executables. Then run:
+The **sdl3-static** CI job provisions
+[Dyne musl v2.7.0](https://github.com/dyne/musl/releases/tag/v2.7.0) for x86-64
+through [dyne/musl-action](https://github.com/dyne/musl-action). The build links
+the toolchain's GLib, GIO, LibreSSL and libsodium archives. SDL3 is built from the
+project's pinned sources with X11 enabled. The SDL3 archive in Dyne v2.7.0
+omits X11.
+
+To reproduce the build locally, set `CC` and `CXX` to the absolute paths to
+`x86_64-linux-musl-gcc` and `x86_64-linux-musl-g++` in the extracted release.
+Use a fresh build directory when switching from another toolchain.
 
 ```sh
-deps_work="$(realpath -m ../roots-gui-musl-deps)"
-bash .github/scripts/prepare-musl-deps.sh "$deps_work"
-export ROOTS_GUI_MUSL_DEPS="$deps_work/sysroot"
+x11_work="$(realpath -m ../roots-gui-musl-x11)"
+bash .github/scripts/prepare-musl-x11.sh "$x11_work"
 cmake -S . -B ../roots-gui-sdl3 -G Ninja -DCMAKE_BUILD_TYPE=Release \
-  -DROOTS_GUI_SDL3=ON -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/linux-musl-x86_64.cmake"
+  -DROOTS_GUI_SDL3=ON -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/linux-musl-x86_64.cmake" \
+  -DROOTS_GUI_MUSL_X11_ROOT="$x11_work/sysroot"
 cmake --build ../roots-gui-sdl3 --target roots-gui -j 2
 cmake --install ../roots-gui-sdl3 --prefix "$PWD/../roots-gui-sdl3-stage"
 ```
 
-The preparation script stages packages from Alpine's signed v3.23 repository
-and builds the missing Xau and libeconf archives from checksum-pinned sources. The
-toolchain file keeps CMake and pkg-config searches in that dependency tree.
-CMake configuration itself is offline. The static build uses the normal
-install layout. `ROOTS_GUI_BUILD_TESTS` and `ROOTS_GUI_LINUX_PACKAGE` apply
-to the default build. The SDL3 CI job checks the installed binary's ELF
-headers and verifies rendered pixels and window-manager close under Xvfb.
+The preparation script stages the X11 dependencies from Alpine's signed v3.23
+repository and builds Xau from checksum-pinned source. CMake and pkg-config
+search the toolchain's bundled libraries and the X11 overlay. CMake
+configuration is offline. The static build uses the normal install layout.
+`ROOTS_GUI_BUILD_TESTS` and `ROOTS_GUI_LINUX_PACKAGE` apply to the default
+build. The SDL3 CI job checks the installed binary's ELF headers and verifies
+rendered pixels and window-manager close under Xvfb.
 
 ## Install and runtime assets
 

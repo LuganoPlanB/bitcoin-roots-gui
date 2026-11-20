@@ -93,25 +93,26 @@ jobs:
       - name: Install build and owned display tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install --no-install-recommends -y ninja-build pkg-config xvfb marco x11-xserver-utils libxtst6 dbus
+          sudo apt-get install --no-install-recommends -y ninja-build pkg-config xvfb marco x11-xserver-utils libxtst6 dbus mate-settings-daemon-common
       - uses: dyne/musl-action@fe1d1871b096824ddb7aa158f68dd63dabdc9586
         id: musl
         with:
           target_arch: x86_64
-          version: v2.6.0
-          sha256: 67629e48c83942e2ce74cfd79b58eda1c7100d5a6c4bc937e69b450670a45a97
+          version: v2.7.0
+          sha256: 0668d8be980648ed4286f80cc453b29d8d51ac961c2a36a29d5ceb3b72db70f1
       - name: Build and exercise the static SDL3 executable
         env:
           CC: ${{ steps.musl.outputs.CC }}
           CXX: ${{ steps.musl.outputs.CXX }}
           BUILD_DIR: ${{ runner.temp }}/roots-gui-sdl3
           STAGE_DIR: ${{ runner.temp }}/roots-gui-sdl3-stage
-          ROOTS_GUI_MUSL_DEPS: ${{ runner.temp }}/roots-gui-musl/sysroot
+          X11_WORK_DIR: ${{ runner.temp }}/roots-gui-musl-x11
         run: |
           set -Eeuo pipefail
-          bash .github/scripts/prepare-musl-deps.sh "${ROOTS_GUI_MUSL_DEPS%/sysroot}" 2>&1 | tee "$RUNNER_TEMP/musl-deps.log"
+          bash .github/scripts/prepare-musl-x11.sh "$X11_WORK_DIR" 2>&1 | tee "$RUNNER_TEMP/musl-x11.log"
           cmake -S . -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DROOTS_GUI_SDL3=ON -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/linux-musl-x86_64.cmake" \
+            -DROOTS_GUI_MUSL_X11_ROOT="$X11_WORK_DIR/sysroot" \
             2>&1 | tee "$RUNNER_TEMP/sdl3-configure.log"
           cmake --build "$BUILD_DIR" --target roots-gui -j 2 2>&1 | tee "$RUNNER_TEMP/sdl3-build.log"
           cmake --install "$BUILD_DIR" --prefix "$STAGE_DIR"
@@ -134,7 +135,7 @@ jobs:
         with:
           name: sdl3-static-evidence
           path: |
-            ${{ runner.temp }}/musl-deps.log
+            ${{ runner.temp }}/musl-x11.log
             ${{ runner.temp }}/sdl3-configure.log
             ${{ runner.temp }}/sdl3-build.log
             ${{ runner.temp }}/sdl3-elf.txt

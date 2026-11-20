@@ -5,6 +5,10 @@ function(roots_gui_add_provider source_dir)
   set(provider_binary "${CMAKE_CURRENT_BINARY_DIR}/provider-build")
   set(provider_archive "${provider_binary}/src/${CMAKE_STATIC_LIBRARY_PREFIX}wallycore${CMAKE_STATIC_LIBRARY_SUFFIX}")
   set(secp_archive "${provider_binary}/src/secp256k1/lib/${CMAKE_STATIC_LIBRARY_PREFIX}secp256k1${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  set(provider_toolchain_args "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}")
+  if(ROOTS_GUI_SDL3)
+    list(APPEND provider_toolchain_args "-DROOTS_GUI_MUSL_X11_ROOT=${ROOTS_GUI_MUSL_X11_ROOT}")
+  endif()
   ExternalProject_Add(roots_gui_provider_build
     SOURCE_DIR "${source_dir}"
     BINARY_DIR "${provider_binary}"
@@ -15,7 +19,7 @@ function(roots_gui_add_provider source_dir)
       "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
       "-DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}"
       "-DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}"
-      "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
+      ${provider_toolchain_args}
       -DBUILD_SHARED_LIBS=OFF -DWALLYCORE_BUILD_ELEMENTS=OFF
       -DWALLYCORE_ENABLE_TESTS=OFF -DWALLYCORE_INSTALL=OFF
     BUILD_COMMAND "${CMAKE_COMMAND}" --build <BINARY_DIR> --parallel 2 --config "$<CONFIG>"

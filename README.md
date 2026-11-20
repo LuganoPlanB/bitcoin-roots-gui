@@ -78,6 +78,12 @@ Those checks have explicit prerequisites and are not all part of routine CI.
 See [the test guide](docs/test-harness.md). Use disposable regtest profiles for
 node-backed tests; never point them at a personal wallet or live network.
 
+## Releases
+
+The [Release workflow](https://github.com/LuganoPlanB/bitcoin-roots-gui/actions/workflows/release.yml)
+previews a semantic version and optionally publishes a source release from a
+tested `main` commit. See [release instructions](docs/releasing.md).
+
 ## Contribute
 
 Start with [AGENTS.md](AGENTS.md) for architecture, build/test commands, and

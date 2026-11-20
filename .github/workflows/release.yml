@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish the calculated source release (false previews only)'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      ready: ${{ steps.plan.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check candidate CI and select release base
+        id: base
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await require('./.github/scripts/release.cjs').prepare({github, context, core});
+      - name: Calculate conventional-commit version
+        id: semver
+        if: steps.base.outputs.base != ''
+        uses: ietf-tools/semver-action@46feaa27e7375da0e3d602721e9fb9573598b880 # v1.12.0
+        with:
+          token: ${{ github.token }}
+          branch: ${{ github.sha }}
+          fromTag: ${{ steps.base.outputs.base }}
+          noNewCommitBehavior: current
+          noVersionBumpBehavior: current
+      - name: Summarize release plan
+        id: plan
+        uses: actions/github-script@v8
+        env:
+          RELEASE_BASE: ${{ steps.base.outputs.base }}
+          RELEASE_BASE_SHA: ${{ steps.base.outputs.base_sha }}
+          RELEASE_NEXT: ${{ steps.semver.outputs.next }}
+          RELEASE_PUBLISH: ${{ inputs.publish }}
+        with:
+          script: |
+            await require('./.github/scripts/release.cjs').finalize({context, core,
+              base: process.env.RELEASE_BASE, baseSha: process.env.RELEASE_BASE_SHA,
+              next: process.env.RELEASE_NEXT, publish: process.env.RELEASE_PUBLISH === 'true'});
+
+  publish:
+    needs: version
+    if: inputs.publish && needs.version.outputs.ready == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Publish tested source commit
+        uses: actions/github-script@v8
+        env:
+          RELEASE_VERSION: ${{ needs.version.outputs.version }}
+        with:
+          script: |
+            await require('./.github/scripts/release.cjs').publish({github, context, core,
+              version: process.env.RELEASE_VERSION});

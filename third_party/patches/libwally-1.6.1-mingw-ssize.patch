@@ -9,3 +9,16 @@ diff --git a/_cmake/config.h.in b/_cmake/config.h.in
  #if defined(_WIN64)
  typedef __int64 ssize_t;
  #else
+diff --git a/src/_CMakeLists.txt b/src/_CMakeLists.txt
+--- a/src/_CMakeLists.txt
++++ b/src/_CMakeLists.txt
+@@ -19,5 +19,9 @@
+ list(REMOVE_ITEM ccan_srcs ccan/ccan/crypto/sha256/sha256_sse4.c)
++if(MINGW AND NOT WALLYCORE_ENABLE_TESTS)
++    # TAP is only used by CCAN tests and expects POSIX stdio extensions.
++    list(FILTER ccan_srcs EXCLUDE REGEX "^ccan/ccan/tap/")
++endif()
+ message("ccan_srcs: ${ccan_srcs}")
+ file(
+     GLOB wallycore_public_headers
+     RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}

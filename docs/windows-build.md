@@ -12,7 +12,8 @@ cmake --install ../roots-gui-win --prefix "$(cygpath -m "$PWD/../roots-gui-win-s
 ```
 
 The build applies a checksum-pinned libwally portability patch during offline
-source preparation. It uses the MinGW system definition of `ssize_t`.
+source preparation. It uses the MinGW system definition of `ssize_t` and
+excludes the unused CCAN test helper from the Windows production library.
 
 Run `bin/roots-gui.exe` from the installed directory. Keep the DLLs and
 `roots-gui-assets/fonts` beside it. Font lookup uses the executable location,

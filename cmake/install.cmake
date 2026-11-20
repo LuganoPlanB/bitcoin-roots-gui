@@ -10,14 +10,15 @@ if(WIN32)
     PRE_EXCLUDE_REGEXES "^api-ms-" "^ext-ms-"
     POST_EXCLUDE_REGEXES "[/\\\\][Ww][Ii][Nn][Dd][Oo][Ww][Ss][/\\\\]"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+elseif(APPLE)
+  install(TARGETS roots-gui BUNDLE DESTINATION .)
 else()
   install(TARGETS roots-gui RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 endif()
-install(FILES
-  "${roots_gui_ui_source}/imkit/assets/fonts/Inter-Regular.ttf"
-  "${roots_gui_ui_source}/imkit/assets/fonts/Inter-SemiBold.ttf"
-  "${roots_gui_ui_source}/imkit/assets/fonts/Inter-OFL.txt"
-  DESTINATION "${CMAKE_INSTALL_BINDIR}/roots-gui-assets/fonts")
+if(NOT APPLE)
+  install(FILES ${roots_gui_font_files}
+    DESTINATION "${CMAKE_INSTALL_BINDIR}/roots-gui-assets/fonts")
+endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   install(FILES packaging/org.bitcoinroots.RootsGui.desktop DESTINATION share/applications)
   install(FILES assets/brand/bitcoinroots-logo.svg

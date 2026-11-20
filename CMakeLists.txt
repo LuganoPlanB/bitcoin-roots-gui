@@ -7,6 +7,9 @@ if(roots_gui_build_in_source)
   message(FATAL_ERROR "Use a build directory outside the source repository, for example: cmake -S . -B ../roots-gui-build")
 endif()
 project(RootsGui VERSION 0.1.0 LANGUAGES C CXX)
+if(APPLE)
+  enable_language(OBJCXX)
+endif()
 option(ROOTS_GUI_BUILD_TESTS "Build the standalone GUI developer tests." OFF)
 option(ROOTS_GUI_SDL3 "Build the fully static Linux SDL3 desktop variant." OFF)
 option(WITH_CCACHE "Use ccache when available unless a launcher is explicitly selected." ON)
@@ -105,6 +108,10 @@ if(WIN32)
   target_sources(roots_gui_platform PRIVATE platform/windows/input.cpp)
   target_compile_definitions(roots_gui_platform PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
   target_link_libraries(roots_gui_platform PRIVATE comdlg32 shell32)
+elseif(APPLE)
+  target_sources(roots_gui_platform PRIVATE platform/macos/metal_renderer.mm)
+  set_property(TARGET roots_gui_platform PROPERTY OBJCXX_STANDARD 20)
+  target_compile_options(roots_gui_platform PRIVATE $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>)
 endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   find_package(PkgConfig REQUIRED)
@@ -120,14 +127,25 @@ target_link_libraries(roots-gui PRIVATE roots_gui_platform roots_gui_ui roots_gu
 if(ROOTS_GUI_SDL3)
   target_link_options(roots-gui PRIVATE -static)
 endif()
-add_custom_command(TARGET roots-gui POST_BUILD
-  COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:roots-gui>/roots-gui-assets/fonts"
-  COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-    "${roots_gui_ui_source}/imkit/assets/fonts/Inter-Regular.ttf"
-    "${roots_gui_ui_source}/imkit/assets/fonts/Inter-SemiBold.ttf"
-    "${roots_gui_ui_source}/imkit/assets/fonts/Inter-OFL.txt"
-    "$<TARGET_FILE_DIR:roots-gui>/roots-gui-assets/fonts"
-  VERBATIM)
+set(roots_gui_font_files
+  "${roots_gui_ui_source}/imkit/assets/fonts/Inter-Regular.ttf"
+  "${roots_gui_ui_source}/imkit/assets/fonts/Inter-SemiBold.ttf"
+  "${roots_gui_ui_source}/imkit/assets/fonts/Inter-OFL.txt")
+if(APPLE)
+  set_target_properties(roots-gui PROPERTIES
+    MACOSX_BUNDLE TRUE OUTPUT_NAME "Bitcoin Roots"
+    MACOSX_BUNDLE_BUNDLE_NAME "Bitcoin Roots"
+    MACOSX_BUNDLE_GUI_IDENTIFIER org.bitcoinroots.RootsGui)
+  set_source_files_properties(${roots_gui_font_files} PROPERTIES
+    MACOSX_PACKAGE_LOCATION "Resources/roots-gui-assets/fonts")
+  target_sources(roots-gui PRIVATE ${roots_gui_font_files})
+else()
+  add_custom_command(TARGET roots-gui POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:roots-gui>/roots-gui-assets/fonts"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+      ${roots_gui_font_files} "$<TARGET_FILE_DIR:roots-gui>/roots-gui-assets/fonts"
+    VERBATIM)
+endif()
 
 option(ROOTS_GUI_LINUX_PACKAGE "Enable the standalone Linux distribution install rules." OFF)
 if(ROOTS_GUI_LINUX_PACKAGE)
@@ -141,6 +159,9 @@ include(cmake/install.cmake)
 if(ROOTS_GUI_BUILD_TESTS AND WIN32)
   enable_testing()
   add_subdirectory(tests/windows)
+elseif(ROOTS_GUI_BUILD_TESTS AND APPLE)
+  enable_testing()
+  add_subdirectory(tests/macos)
 elseif(ROOTS_GUI_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests/engine)

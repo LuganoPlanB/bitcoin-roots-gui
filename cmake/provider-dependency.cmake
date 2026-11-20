@@ -8,6 +8,11 @@ function(roots_gui_add_provider source_dir)
   set(provider_toolchain_args "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}")
   if(ROOTS_GUI_SDL3)
     list(APPEND provider_toolchain_args "-DROOTS_GUI_MUSL_X11_ROOT=${ROOTS_GUI_MUSL_X11_ROOT}")
+  elseif(APPLE)
+    list(APPEND provider_toolchain_args
+      "-DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}"
+      "-DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}"
+      "-DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}")
   endif()
   ExternalProject_Add(roots_gui_provider_build
     SOURCE_DIR "${source_dir}"

@@ -2,8 +2,8 @@
 
 The repository root is the CMake source directory. No Bitcoin source tree,
 Core libraries, Boost or Qt are part of this build. Linux X11/OpenGL is the
-supported path; macOS/Metal and Windows/OpenGL source branches need their own
-qualification.
+default desktop build. See the native guides for [Windows x64](windows-build.md)
+and [Apple Silicon](macos-build.md).
 
 ## Prerequisites and normal build
 

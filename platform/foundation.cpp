@@ -18,7 +18,9 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <imgui_impl_glfw.h>
-#if !defined(__APPLE__)
+#if defined(__APPLE__)
+#include "platform/macos/metal_renderer.h"
+#else
 #include <imgui_impl_opengl3.h>
 #endif
 #endif
@@ -374,13 +376,14 @@ std::string BuildInfo()
 #else
     auto* volatile platform_entry = &ImGui_ImplGlfw_InitForOther;
 #if defined(__APPLE__)
-    const bool renderer_linked = false; // Metal native host remains follow-on work.
+    return "\"glfw\":\"" + std::string(glfwGetVersionString()) + "\",\"renderer\":\"Metal\",\"backend_symbols_linked\":" +
+           (platform_entry && MetalRenderer::BackendLinked() ? "true" : "false") + ",\"native_initialized\":false";
 #else
     auto* volatile renderer_entry = &ImGui_ImplOpenGL3_Init;
     const bool renderer_linked = renderer_entry != nullptr;
-#endif
     return "\"glfw\":\"" + std::string(glfwGetVersionString()) + "\",\"backend_symbols_linked\":" +
            (platform_entry && renderer_linked ? "true" : "false") + ",\"native_initialized\":false";
+#endif
 #endif
 }
 int Run(std::optional<RestartContext> resumed)

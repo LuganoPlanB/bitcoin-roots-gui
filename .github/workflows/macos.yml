@@ -1,0 +1,77 @@
+name: Apple Silicon GUI
+
+on:
+  push:
+    branches: [main, 'macos/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apple-silicon-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-package:
+    runs-on: macos-15
+    timeout-minutes: 25
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Prepare ARM64 build prerequisites
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64
+          xcodebuild -version
+          brew install cmake ninja pkgconf openssl@3 libsodium
+      - name: Build and check the macOS bundle
+        run: |
+          set -euo pipefail
+          build="$RUNNER_TEMP/roots-gui-macos"
+          stage="$RUNNER_TEMP/roots-gui-macos-stage"
+          openssl="$(brew --prefix openssl@3)"
+          sodium="$(brew --prefix libsodium)"
+          cmake -S . -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+            -DCMAKE_PREFIX_PATH="$sodium;$openssl" -DOPENSSL_ROOT_DIR="$openssl" \
+            -DROOTS_GUI_BUILD_TESTS=ON
+          cmake --build "$build" --target roots-gui roots_gui_macos_window -j 2
+          ctest --test-dir "$build" --no-tests=error --output-on-failure --verbose
+          cmake --install "$build" --prefix "$stage"
+          licenses="$stage/share/doc/roots-gui/licenses"
+          cp "$openssl/LICENSE.txt" "$licenses/openssl.txt"
+          cp "$sodium/LICENSE" "$licenses/libsodium.txt"
+          codesign --force --sign - "$stage/Bitcoin Roots.app"
+          archive="$RUNNER_TEMP/bitcoin-roots-gui-macos-arm64.zip"
+          ditto -c -k "$stage" "$archive"
+
+          relocated="$RUNNER_TEMP/Relocated Roots"
+          ditto -x -k "$archive" "$relocated"
+          app="$relocated/Bitcoin Roots.app"
+          binary="$app/Contents/MacOS/Bitcoin Roots"
+          codesign --verify --strict "$app"
+          test "$(lipo -archs "$binary")" = arm64
+          otool -L "$binary" | tee "$RUNNER_TEMP/macos-linkage.txt"
+          awk 'NR > 1 && $1 !~ /^\/(usr\/lib|System\/Library)\// { print "Unexpected runtime dependency:", $1; bad=1 } END {exit bad}' "$RUNNER_TEMP/macos-linkage.txt"
+          test -f "$app/Contents/Resources/roots-gui-assets/fonts/Inter-Regular.ttf"
+          test -f "$app/Contents/Resources/roots-gui-assets/fonts/Inter-SemiBold.ttf"
+          cd "$RUNNER_TEMP"
+          "$binary" --version
+          "$binary" --build-contract | tee "$RUNNER_TEMP/macos-build-contract.json" | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)
+          assert d["renderer"] == "Metal" and d["backend_symbols_linked"] and not d["native_initialized"], d
+          '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bitcoin-roots-gui-macos-arm64
+          path: |
+            ${{ runner.temp }}/bitcoin-roots-gui-macos-arm64.zip
+            ${{ runner.temp }}/macos-linkage.txt
+            ${{ runner.temp }}/macos-build-contract.json
+          if-no-files-found: error

@@ -25,21 +25,45 @@ jobs:
           msystem: UCRT64
           update: true
           install: git
-          pacboy: gcc:p cmake:p ninja:p python:p pkgconf:p openssl:p libsodium:p mesa:p
-      - name: Build, test and stage the Windows executable
+          pacboy: gcc:p cmake:p ninja:p python:p pkgconf:p openssl:p libsodium:p mesa:p ccache:p
+      - uses: actions/cache/restore@v4
+        id: compiler-cache
+        with:
+          path: ${{ runner.temp }}/roots-windows-ccache
+          key: roots-windows-ucrt64-${{ github.sha }}
+          restore-keys: roots-windows-ucrt64-
+      - name: Build and exercise RPC on Windows
+        shell: msys2 {0}
+        run: |
+          set -Eeuo pipefail
+          build="$(cygpath -m "$RUNNER_TEMP")/roots-windows-build"
+          export CCACHE_DIR="${build%/*}/roots-windows-ccache"
+          export CCACHE_MAXSIZE=200M
+          cmake -S . -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DROOTS_GUI_BUILD_TESTS=ON
+          cmake --build "$build" --target roots-gui roots_gui_windows_input roots_gui_windows_rpc -j 2
+          ctest --test-dir "$build" --no-tests=error --output-on-failure
+      - uses: actions/cache/save@v4
+        if: always() && steps.compiler-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}/roots-windows-ccache
+          key: roots-windows-ucrt64-${{ github.sha }}
+      - name: Stage and exercise the Windows desktop package
         shell: msys2 {0}
         run: |
           set -Eeuo pipefail
           build="$(cygpath -m "$RUNNER_TEMP")/roots-windows-build"
           stage="$(cygpath -m "$RUNNER_TEMP")/roots-windows-stage"
-          cmake -S . -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DROOTS_GUI_BUILD_TESTS=ON
-          cmake --build "$build" --target roots-gui roots_gui_windows_input roots_gui_windows_rpc -j 2
-          ctest --test-dir "$build" --no-tests=error --output-on-failure
           cmake --install "$build" --prefix "$stage"
-          for package in openssl libsodium gcc-libs winpthreads zlib; do
-            if [[ -d "/ucrt64/share/licenses/$package" ]]; then
-              cp -r "/ucrt64/share/licenses/$package" "$stage/share/doc/roots-gui/licenses/msys2-$package"
-            fi
+          declare -A seen=()
+          for dll in "$stage/bin/"*.dll; do
+            owner="$(pacman -Qoq "/ucrt64/bin/${dll##*/}")"
+            if [[ "${seen[$owner]:-}" ]]; then continue; fi
+            seen[$owner]=1
+            while IFS= read -r notice; do
+              if [[ "$notice" == /ucrt64/share/licenses/* && -f "$notice" ]]; then
+                install -Dm644 "$notice" "$stage/share/doc/roots-gui/licenses/msys2-$owner/${notice#/ucrt64/share/licenses/}"
+              fi
+            done < <(pacman -Qql "$owner")
           done
           cp /ucrt64/bin/opengl32.dll "$build/"
           GALLIUM_DRIVER=llvmpipe timeout 30s "$build/roots_gui_windows_input.exe" --owned-desktop

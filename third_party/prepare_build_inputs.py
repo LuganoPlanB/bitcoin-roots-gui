@@ -77,8 +77,8 @@ def main():
     print(
         json.dumps(
             {
-                "uiSource": str(ui_destination),
-                "providerSource": str(provider_destination / "libwally-core-1.6.1"),
+                "uiSource": ui_destination.as_posix(),
+                "providerSource": (provider_destination / "libwally-core-1.6.1").as_posix(),
                 "providerIdentity": identity,
                 "uiIdentity": ui["sha256"],
             }

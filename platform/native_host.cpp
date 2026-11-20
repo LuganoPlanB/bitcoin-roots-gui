@@ -12,6 +12,11 @@
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 #else
+#if defined(__APPLE__)
+#define GLFW_INCLUDE_NONE
+#include "platform/macos/metal_renderer.h"
+#include <mach-o/dyld.h>
+#endif
 #include <GLFW/glfw3.h>
 #include <imgui_impl_glfw.h>
 #if defined(__linux__)
@@ -57,6 +62,14 @@ std::filesystem::path ExecutableFontDirectory()
     if (!length || length >= executable.size()) throw std::runtime_error("could not locate the Windows executable");
     executable.resize(length);
     return std::filesystem::path(executable).parent_path() / "roots-gui-assets/fonts";
+#elif defined(__APPLE__)
+    std::uint32_t size = 0;
+    _NSGetExecutablePath(nullptr, &size);
+    std::string executable(size, '\0');
+    if (_NSGetExecutablePath(executable.data(), &size) != 0)
+        throw std::runtime_error("could not locate the macOS executable");
+    const auto bundle = std::filesystem::canonical(executable.c_str()).parent_path().parent_path();
+    return bundle / "Resources/roots-gui-assets/fonts";
 #else
     throw std::runtime_error("native asset location is not yet qualified on this platform");
 #endif
@@ -74,6 +87,8 @@ struct NativeHost::Impl {
     SDL_Renderer* sdl_renderer{};
     bool close_requested{}, recreate_resources{}, vsync{};
     std::optional<DroppedPaths> pending_drop;
+#elif defined(__APPLE__)
+    std::unique_ptr<MetalRenderer> metal_renderer;
 #else
     std::vector<unsigned int> texture_ids;
 #endif
@@ -119,9 +134,6 @@ struct NativeHost::Impl {
             draw_state.appearance_choice=static_cast<int>(choice);
             invalid_saved=!saved.valid;
         }
-#if defined(__APPLE__)
-        throw std::runtime_error("macOS Metal production lifecycle remains follow-on work");
-#else
         if (options.width < 960 || options.height < 640 || !std::isfinite(options.font_scale) ||
             options.font_scale < .5F || options.font_scale > 2.F) throw std::invalid_argument("invalid native window/font settings");
         if (!std::isfinite(options.fixed_delta_seconds) || options.fixed_delta_seconds<0 || options.fixed_delta_seconds>1)
@@ -146,9 +158,13 @@ struct NativeHost::Impl {
         glfwSetErrorCallback([](int code, const char* message) { std::fprintf(stderr, "GLFW %d: %s\n", code, message); });
         if (!glfwInit()) throw std::runtime_error("GLFW initialization failed");
         library = true;
+#if defined(__APPLE__)
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+#else
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#endif
         glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
         glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
         window = glfwCreateWindow(options.width, options.height, "Bitcoin Roots", nullptr, nullptr);
@@ -162,11 +178,13 @@ struct NativeHost::Impl {
             for(int i=0;i<count;++i){if(!paths[i])return;const auto length=strnlen(paths[i],4097);if(!length || length>4096)return;drop.paths.emplace_back(paths[i],length);}
             self->drops.push_back(std::move(drop));
         });
+#if !defined(__APPLE__)
         glfwMakeContextCurrent(window);
         glfwSwapInterval(1);
         const auto* name = glGetString(GL_RENDERER);
         if (!name) throw std::runtime_error("OpenGL context could not be made current");
         renderer_name = reinterpret_cast<const char*>(name);
+#endif
 #if defined(__linux__)
         x11_window = glfwGetX11Window(window);
 #endif
@@ -197,6 +215,15 @@ struct NativeHost::Impl {
         RequireSdl(ImGui_ImplSDL3_InitForSDLRenderer(window, sdl_renderer), "SDL3 ImGui backend initialization failed");
         platform = true;
         RequireSdl(ImGui_ImplSDLRenderer3_Init(sdl_renderer), "SDL3 ImGui renderer initialization failed");
+#elif defined(__APPLE__)
+        if (!ImGui_ImplGlfw_InitForOther(window, true)) throw std::runtime_error("GLFW ImGui backend initialization failed");
+        platform = true;
+        metal_renderer = std::make_unique<MetalRenderer>(window);
+        renderer_name = metal_renderer->Name();
+        // The GLFW clipboard backend bypasses the scoped input adapter.
+        // Leave clipboard integration unavailable until macOS has that adapter.
+        ImGui::GetPlatformIO().Platform_GetClipboardTextFn = [](ImGuiContext*) -> const char* { return ""; };
+        ImGui::GetPlatformIO().Platform_SetClipboardTextFn = [](ImGuiContext*, const char*) {};
 #else
         if (!ImGui_ImplGlfw_InitForOpenGL(window, true)) throw std::runtime_error("GLFW ImGui backend initialization failed");
         platform = true; // Stock callbacks always forward focus, mouse, key and character events.
@@ -213,7 +240,6 @@ struct NativeHost::Impl {
             platform_io.Platform_GetClipboardTextFn=[](ImGuiContext*){return static_cast<NativeInput*>(ImGui::GetPlatformIO().Platform_ClipboardUserData)->ClipboardForPaste();};
             platform_io.Platform_SetClipboardTextFn=[](ImGuiContext*,const char* text){if(text)static_cast<NativeInput*>(ImGui::GetPlatformIO().Platform_ClipboardUserData)->Copy(text);};
         }
-#endif
     }
     bool Visible() const
     {
@@ -330,9 +356,6 @@ struct NativeHost::Impl {
     int Loop()
     {
         Owner();
-#if defined(__APPLE__)
-        return 1;
-#else
         for (;;) {
             ++iteration;
             PollEvents();
@@ -359,7 +382,13 @@ struct NativeHost::Impl {
 #endif
                 continue;
             }
+#if defined(__APPLE__)
+            // Cocoa window coordinates are points. GLFW supplies Retina pixel
+            // scale separately through ImDrawData::FramebufferScale.
+            constexpr float dpi = 1;
+#else
             const float dpi = std::max(facts.dpi_x, facts.dpi_y);
+#endif
             if (!options.appearance_file.empty()) {
                 last_system_dark=options.system_appearance_reader?options.system_appearance_reader():system_appearance.Dark();
                 const bool dark=ui::theme::IsDark(choice, last_system_dark.value_or(false));
@@ -391,6 +420,12 @@ struct NativeHost::Impl {
             if (std::exchange(recreate_resources, false)) ImGui_ImplSDLRenderer3_DestroyDeviceObjects();
             ImGui_ImplSDLRenderer3_NewFrame();
             ImGui_ImplSDL3_NewFrame();
+#elif defined(__APPLE__)
+            if (!metal_renderer->BeginFrame(facts.framebuffer_width, facts.framebuffer_height, facts.dpi_x)) {
+                glfwWaitEventsTimeout(.01);
+                continue;
+            }
+            ImGui_ImplGlfw_NewFrame();
 #else
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
@@ -432,6 +467,8 @@ struct NativeHost::Impl {
             RequireSdl(SDL_SetRenderDrawColorFloat(sdl_renderer, theme.semantic.canvas.x, theme.semantic.canvas.y, theme.semantic.canvas.z, 1), "SDL3 canvas color failed");
             RequireSdl(SDL_RenderClear(sdl_renderer), "SDL3 canvas clear failed");
             ImGui_ImplSDLRenderer3_RenderDrawData(draw_data, sdl_renderer);
+#elif defined(__APPLE__)
+            metal_renderer->Present(theme.semantic.canvas.x, theme.semantic.canvas.y, theme.semantic.canvas.z);
 #else
             glViewport(0, 0, facts.framebuffer_width, facts.framebuffer_height);
             glClearColor(theme.semantic.canvas.x, theme.semantic.canvas.y, theme.semantic.canvas.z, 1);
@@ -442,7 +479,7 @@ struct NativeHost::Impl {
 #endif
             for (auto* texture : ImGui::GetPlatformIO().Textures) {
                 if (texture->TexID != ImTextureID_Invalid) {
-#ifndef ROOTS_GUI_SDL3
+#if !defined(ROOTS_GUI_SDL3) && !defined(__APPLE__)
                     const auto id = static_cast<unsigned int>(texture->TexID);
                     if (std::find(texture_ids.begin(), texture_ids.end(), id) == texture_ids.end()) texture_ids.push_back(id);
 #endif
@@ -455,6 +492,9 @@ struct NativeHost::Impl {
 #endif
             facts.rendered_frames = ++rendered;
             if (observer && observer->CaptureFramebuffer()) {
+#if defined(__APPLE__)
+                throw std::logic_error("framebuffer capture is unavailable for the Metal host");
+#else
                 pixels.resize(static_cast<std::size_t>(facts.framebuffer_width) * facts.framebuffer_height * 4);
 #ifdef ROOTS_GUI_SDL3
                 using Surface = std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)>;
@@ -473,18 +513,18 @@ struct NativeHost::Impl {
                 if (glGetError()) throw std::runtime_error("framebuffer readback failed");
 #endif
                 facts.rgba = pixels;
+#endif
             }
             if (facts.draw.close_requested) SetShouldClose(true);
             if (observer) observer->Frame(*host, facts);
 #ifdef ROOTS_GUI_SDL3
             RequireSdl(SDL_RenderPresent(sdl_renderer), "SDL3 present failed");
             if (!vsync) SDL_Delay(16);
-#else
+#elif !defined(__APPLE__)
             glfwSwapBuffers(window);
 #endif
         }
         return 0;
-#endif
     }
     ~Impl()
     {
@@ -507,17 +547,26 @@ struct NativeHost::Impl {
         if (window) SDL_DestroyWindow(window);
         if (library) SDL_Quit();
         state.context_cleared = !SDL_WasInit(SDL_INIT_VIDEO);
-#elif !defined(__APPLE__)
+#else
+#if defined(__APPLE__)
+        metal_renderer.reset();
+        if (context) state.renderer_cleared = ImGui::GetIO().BackendRendererUserData == nullptr;
+        state.textures_released = state.renderer_cleared;
+#else
         if (window) glfwMakeContextCurrent(window);
         if (renderer) ImGui_ImplOpenGL3_Shutdown();
         if (context) state.renderer_cleared = ImGui::GetIO().BackendRendererUserData == nullptr;
         state.textures_released = true;
         for (const auto id : texture_ids) state.textures_released &= glIsTexture(id) == GL_FALSE;
+#endif
         if (platform) ImGui_ImplGlfw_Shutdown();
         if (context) state.platform_cleared = ImGui::GetIO().BackendPlatformUserData == nullptr;
         if (context) ImGui::DestroyContext();
         state.imgui_cleared = ImGui::GetCurrentContext() == nullptr;
-        if (window) { glfwMakeContextCurrent(nullptr); glfwDestroyWindow(window); }
+#if !defined(__APPLE__)
+        if (window) glfwMakeContextCurrent(nullptr);
+#endif
+        if (window) glfwDestroyWindow(window);
         state.context_cleared = !library || glfwGetCurrentContext() == nullptr;
         if (library) glfwTerminate();
 #endif
@@ -592,7 +641,9 @@ void NativeHost::RecreateRendererResources()
     m_impl->Owner();
 #if defined(ROOTS_GUI_SDL3)
     m_impl->recreate_resources = true;
-#elif !defined(__APPLE__)
+#elif defined(__APPLE__)
+    m_impl->metal_renderer->RecreateResources();
+#else
     ImGui_ImplOpenGL3_DestroyDeviceObjects();
 #endif
 }

@@ -62,6 +62,7 @@ musl dependency tree and the Dyne musl toolchain as shown in the
 Debug developer builds and the AT-SPI2 automation.
 
 For native Windows x64 builds and the CI package, see [Windows build and integration](docs/windows-build.md).
+For Apple Silicon builds and the macOS app bundle, see [Apple Silicon build](docs/macos-build.md).
 
 ## Test
 

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Plan-B Foundation
 // Distributed under the MIT software license, see the accompanying COPYING file.
 #include "platform/shell_composition.h"
+#include "application/build_info.h"
 #include <GLFW/glfw3.h>
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
@@ -152,7 +153,7 @@ struct Observer final:p::NativeObserver {
         case 1:if(Queue("About",c::ax::SemanticAction::Press))stage=2;break;
         case 2:
             if(!facts.desktop_visible || !Settled(frame))break;
-            Capture(frame,"help-about",{"About Bitcoin Roots","32.1-roots.1","Plan-B Foundation","Bitcoin Core v32.1"});
+            Capture(frame,"help-about",{"About Bitcoin Roots GUI",std::string("GUI version ")+GUI_VERSION,"Plan-B Foundation"});
             Press(host,facts.desktop.at("source"));stage=3;break;
         case 3:Release();stage=4;break;
         case 4:

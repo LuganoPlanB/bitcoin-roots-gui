@@ -80,6 +80,7 @@ function finalize({context, core, base, baseSha, next, publish, builds}) {
   const version = validateVersion(base ? next : 'v0.1.0');
   const ready = !base || version !== base || baseSha === context.sha;
   core.setOutput('version', version);
+  core.setOutput('build_version', version.slice(1));
   core.setOutput('ready', String(ready));
   return core.summary.addHeading(publish ? 'Release requested' : 'Release preview')
     .addTable([
@@ -138,8 +139,12 @@ function verifiedAssets(assets, files) {
   return verified;
 }
 
-async function publish({github, context, core, version, builds, assetRoot}) {
+async function publish({github, context, core, version, builds, artifacts, assetRoot}) {
   validateVersion(version);
+  if (artifacts.length !== Object.keys(platforms).length || new Set(artifacts).size !== artifacts.length
+      || artifacts.some(id => !/^[1-9]\d*$/.test(id))) {
+    throw new Error('Release requires three distinct versioned package artifacts');
+  }
   const checkBuilds = async () => {
     if (!isDeepStrictEqual(await assertCandidate({github, context}), builds)) {
       throw new Error('The selected build artifacts have changed; dispatch again');
@@ -157,7 +162,7 @@ async function publish({github, context, core, version, builds, assetRoot}) {
   })).filter(release => release.tag_name === version);
   if (matches.length > 1) throw new Error('Multiple releases for this tag require manual inspection');
   let [release] = matches;
-  const marker = `<!-- roots-gui-assets ${context.sha} ${Object.values(builds).map(build => build.artifact).join(' ')} -->`;
+  const marker = `<!-- roots-gui-assets ${context.sha} ${artifacts.join(' ')} -->`;
   if (release) {
     if (release.prerelease) throw new Error('Existing release requires manual inspection');
     if (!release.draft) {
@@ -173,10 +178,11 @@ async function publish({github, context, core, version, builds, assetRoot}) {
   const files = releaseFiles(assetRoot);
   if (!release) {
     const sources = Object.entries(platforms).map(([platform, spec]) =>
-      `- [${spec.label} build](${builds[platform].url})`).join('\n');
+      `- [${spec.label} candidate CI](${builds[platform].url})`).join('\n');
     ({data: release} = await github.rest.repos.createRelease({
       ...context.repo, tag_name: version, target_commitish: context.sha, name: version,
-      body: `Built from \`${context.sha}\`. Verify the archives with \`SHA256SUMS\`.
+      body: `Built from \`${context.sha}\` in [Release run ${context.runId}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}).
+Verify the archives with \`SHA256SUMS\`.
 
 ${sources}
 

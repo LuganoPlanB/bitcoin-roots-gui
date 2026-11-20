@@ -23,6 +23,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       version: ${{ steps.plan.outputs.version }}
+      build_version: ${{ steps.plan.outputs.build_version }}
       ready: ${{ steps.plan.outputs.ready }}
       builds: ${{ steps.base.outputs.builds }}
     steps:
@@ -63,9 +64,29 @@ jobs:
               next: process.env.RELEASE_NEXT, publish: process.env.RELEASE_PUBLISH === 'true',
               builds: JSON.parse(process.env.RELEASE_BUILDS)});
 
-  publish:
+  linux:
     needs: version
     if: inputs.publish && needs.version.outputs.ready == 'true'
+    uses: ./.github/workflows/ci.yml
+    with:
+      release_version: ${{ needs.version.outputs.build_version }}
+
+  windows:
+    needs: version
+    if: inputs.publish && needs.version.outputs.ready == 'true'
+    uses: ./.github/workflows/windows.yml
+    with:
+      release_version: ${{ needs.version.outputs.build_version }}
+
+  macos:
+    needs: version
+    if: inputs.publish && needs.version.outputs.ready == 'true'
+    uses: ./.github/workflows/macos.yml
+    with:
+      release_version: ${{ needs.version.outputs.build_version }}
+
+  publish:
+    needs: [version, linux, windows, macos]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -80,25 +101,19 @@ jobs:
       - name: Download the tested Linux Musl package
         uses: actions/download-artifact@v4
         with:
-          github-token: ${{ github.token }}
-          run-id: ${{ fromJSON(needs.version.outputs.builds).linux.run }}
-          artifact-ids: ${{ fromJSON(needs.version.outputs.builds).linux.artifact }}
+          artifact-ids: ${{ needs.linux.outputs.artifact_id }}
           merge-multiple: true
           path: ${{ runner.temp }}/release-assets/linux
       - name: Download the tested Windows package
         uses: actions/download-artifact@v4
         with:
-          github-token: ${{ github.token }}
-          run-id: ${{ fromJSON(needs.version.outputs.builds).windows.run }}
-          artifact-ids: ${{ fromJSON(needs.version.outputs.builds).windows.artifact }}
+          artifact-ids: ${{ needs.windows.outputs.artifact_id }}
           merge-multiple: true
           path: ${{ runner.temp }}/release-assets/windows
       - name: Download the tested macOS ARM64 package
         uses: actions/download-artifact@v4
         with:
-          github-token: ${{ github.token }}
-          run-id: ${{ fromJSON(needs.version.outputs.builds).macos.run }}
-          artifact-ids: ${{ fromJSON(needs.version.outputs.builds).macos.artifact }}
+          artifact-ids: ${{ needs.macos.outputs.artifact_id }}
           merge-multiple: true
           path: ${{ runner.temp }}/release-assets/macos
       - name: Publish the tested commit and verified desktop packages
@@ -106,9 +121,11 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.version.outputs.version }}
           RELEASE_BUILDS: ${{ needs.version.outputs.builds }}
+          RELEASE_ARTIFACTS: ${{ format('{0},{1},{2}', needs.linux.outputs.artifact_id, needs.windows.outputs.artifact_id, needs.macos.outputs.artifact_id) }}
           RELEASE_ASSET_ROOT: ${{ runner.temp }}/release-assets
         with:
           script: |
             await require('./.github/scripts/release.cjs').publish({github, context, core,
               version: process.env.RELEASE_VERSION, builds: JSON.parse(process.env.RELEASE_BUILDS),
+              artifacts: process.env.RELEASE_ARTIFACTS.split(','),
               assetRoot: process.env.RELEASE_ASSET_ROOT});

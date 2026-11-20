@@ -14,7 +14,8 @@ int main(int argc, char** argv)
             return 0;
         }
         if (argc == 2 && std::string_view(argv[1]) == "--build-contract") {
-            const auto value = "{\"stage\":\"native-bootstrap\"," + roots::gui::ProviderBuildInfo() + "," +
+            const auto value = std::string("{\"stage\":\"native-bootstrap\",\"gui_version\":\"") +
+                roots::gui::GUI_VERSION + "\"," + roots::gui::ProviderBuildInfo() + "," +
                 roots::gui::ui::BuildInfo() + "," + roots::gui::platform::BuildInfo() + "}";
             std::puts(value.c_str());
             return 0;

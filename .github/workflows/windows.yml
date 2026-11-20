@@ -4,18 +4,30 @@ on:
   push:
     branches: [main, 'windows/**']
   pull_request:
+  workflow_call:
+    inputs:
+      release_version:
+        required: true
+        type: string
+    outputs:
+      artifact_id:
+        value: ${{ jobs.build-and-integrate.outputs.artifact_id }}
 
 permissions:
   contents: read
 
 concurrency:
-  group: native-windows-${{ github.ref }}
+  group: native-windows-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build-and-integrate:
     runs-on: windows-2025
     timeout-minutes: 25
+    outputs:
+      artifact_id: ${{ steps.package.outputs.artifact-id }}
+    env:
+      ROOTS_GUI_VERSION: ${{ inputs.release_version || '0.0.0-dev' }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -39,7 +51,8 @@ jobs:
           build="$(cygpath -m "$RUNNER_TEMP")/roots-windows-build"
           export CCACHE_DIR="${build%/*}/roots-windows-ccache"
           export CCACHE_MAXSIZE=200M
-          cmake -S . -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DROOTS_GUI_BUILD_TESTS=ON
+          cmake -S . -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DROOTS_GUI_BUILD_TESTS=ON \
+            -DROOTS_GUI_VERSION="$ROOTS_GUI_VERSION"
           cmake --build "$build" --target roots-gui roots_gui_windows_input roots_gui_windows_rpc -j 2
           ctest --test-dir "$build" --no-tests=error --output-on-failure
       - uses: actions/cache/save@v4
@@ -67,7 +80,7 @@ jobs:
           done
           cp /ucrt64/bin/opengl32.dll "$build/"
           GALLIUM_DRIVER=llvmpipe timeout 30s "$build/roots_gui_windows_input.exe" --owned-desktop
-          python -B tests/windows/entry.py "$stage" "$(cygpath -m /ucrt64/bin)"
+          python -B tests/windows/entry.py "$stage" "$(cygpath -m /ucrt64/bin)" "$ROOTS_GUI_VERSION"
           archive="$(cygpath -m "$RUNNER_TEMP")/bitcoin-roots-gui-windows-x86_64.zip"
           python -B - "$archive" "$stage" <<'PY'
           import sys
@@ -82,6 +95,7 @@ jobs:
                       archive.write(path, path.relative_to(stage))
           PY
       - uses: actions/upload-artifact@v4
+        id: package
         with:
           name: bitcoin-roots-gui-windows-x86_64
           path: ${{ runner.temp }}/bitcoin-roots-gui-windows-x86_64.zip

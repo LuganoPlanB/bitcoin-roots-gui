@@ -6,12 +6,12 @@ import json
 import subprocess
 import sys
 
-binary = sys.argv[1]
+binary, gui_version = sys.argv[1:]
 executed = 0
 version = subprocess.run(
     [binary, "--version"], capture_output=True, text=True, check=True
 )
-assert version.stdout.strip() == "roots-gui 32.1-roots.1"
+assert version.stdout.strip() == f"roots-gui {gui_version}", version.stdout
 executed += 1
 result = subprocess.run(
     [binary, "--build-contract"], capture_output=True, text=True, check=True
@@ -19,6 +19,7 @@ result = subprocess.run(
 info = json.loads(result.stdout)
 for key, expected in {
     "stage": "native-bootstrap",
+    "gui_version": gui_version,
     "wally": 0x10601,
     "curl": 0x081700,
     "sqlite": 3054001,

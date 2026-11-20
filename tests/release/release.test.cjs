@@ -23,7 +23,8 @@ function fixture(t) {
   const outputs = {};
   const writes = [];
   const state = {tag: null, release: null, assets: [], head: sha, runs: {}, artifacts: {}};
-  const context = {repo: {owner: 'fixture', repo: 'gui'}, ref: 'refs/heads/main', sha};
+  const context = {repo: {owner: 'fixture', repo: 'gui'}, ref: 'refs/heads/main', sha,
+    runId: 3000, serverUrl: 'https://github.test'};
   const core = {setOutput: (key, value) => { outputs[key] = value; }, info: () => {},
     summary: {addHeading() { return this; }, addTable() { return this; }, async write() {}}};
   const assetRoot = mkdtempSync(join(tmpdir(), 'roots-gui-release-test-'));
@@ -84,7 +85,8 @@ function fixture(t) {
       },
     },
   }};
-  return {github, context, core, outputs, writes, state, assetRoot, builds, version: 'v0.1.0'};
+  return {github, context, core, outputs, writes, state, assetRoot, builds, version: 'v0.1.0',
+    artifacts: ['3001', '3002', '3003']};
 }
 
 test('bootstrap preview selects v0.1.0 and performs no writes', async t => {
@@ -93,7 +95,7 @@ test('bootstrap preview selects v0.1.0 and performs no writes', async t => {
   assert.equal(f.outputs.base, '');
   await finalize({...f, base: '', publish: false});
   assert.deepEqual(f.outputs, {
-    base: '', base_sha: '', version: 'v0.1.0', ready: 'true', builds: JSON.stringify(f.builds),
+    base: '', base_sha: '', version: 'v0.1.0', build_version: '0.1.0', ready: 'true', builds: JSON.stringify(f.builds),
   });
   assert.deepEqual(f.writes, []);
 });
@@ -120,6 +122,7 @@ test('unchanged version skips docs-only commits but allows recovery at tagged co
   assert.equal(f.outputs.ready, 'true');
   await finalize({...f, base: 'v0.1.0', next: 'v0.2.0', baseSha: oldSha});
   assert.equal(f.outputs.version, 'v0.2.0');
+  assert.equal(f.outputs.build_version, '0.2.0');
   assert.equal(f.outputs.ready, 'true');
 });
 
@@ -176,6 +179,7 @@ test('publishes all three exact-commit archives and checksums before exposing th
   assert.equal(draft.generate_release_notes, true);
   assert.equal(draft.draft, true);
   assert.equal(draft.prerelease, false);
+  assert.ok(draft.body.includes(`<!-- roots-gui-assets ${sha} 3001 3002 3003 -->`));
   assert.deepEqual(f.writes[5][1], {...f.context.repo, sha, ref: 'refs/tags/v0.1.0'});
   assert.equal(f.writes[6][1].draft, false);
   const names = packages.map(([, , name, extension]) => name + extension);
@@ -198,6 +202,7 @@ test('recovers an interrupted workflow draft without reuploading verified assets
   assert.equal(f.state.release.draft, true);
   assert.equal(f.state.tag, null);
   f.github.rest.repos.uploadReleaseAsset = upload;
+  await assert.rejects(publish({...f, artifacts: ['4001', '4002', '4003']}), /draft release requires manual inspection/);
   await publish(f);
   assert.deepEqual(f.writes.map(w => w[0]), ['draft', 'asset', 'asset', 'asset', 'asset', 'tag', 'publish']);
 });
@@ -309,4 +314,12 @@ test('rejects malformed versions before release writes', async t => {
     await assert.rejects(publish({...f, version}), /Invalid stable release tag/);
     assert.deepEqual(f.writes, []);
   }
+});
+
+test('rejects missing or duplicate release package IDs before writes', async t => {
+  const f = fixture(t);
+  for (const artifacts of [[], ['3001', '3002', ''], ['3001', '3002', '3002']]) {
+    await assert.rejects(publish({...f, artifacts}), /three distinct versioned package artifacts/);
+  }
+  assert.deepEqual(f.writes, []);
 });

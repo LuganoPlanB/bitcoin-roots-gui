@@ -19,7 +19,7 @@ const char* Title(DesktopPage page)
     case DesktopPage::Documentation:return "Documentation";
     case DesktopPage::Support:return "Support";
     case DesktopPage::Report:return "Report an issue";
-    case DesktopPage::About:return "About Bitcoin Roots";
+    case DesktopPage::About:return "About Bitcoin Roots GUI";
     case DesktopPage::Restart:return "Restart GUI";
     default:return "Desktop and Help";
     }
@@ -172,7 +172,7 @@ void DrawPage(State& s,a::Requests& host,Facts& f,const imkit::Theme& theme)
     case DesktopPage::About:
         Text(s,"version","GUI version",std::string("GUI version ")+GUI_VERSION);
         Text(s,"license","Source and license","Bitcoin Roots by Plan-B Foundation · MIT license");
-        Text(s,"lineage","Project lineage","Based on Bitcoin Core v32.1, with selected Bitcoin Knots policy features.");
+        Text(s,"lineage","Project lineage","Based on Bitcoin Core, with selected Bitcoin Knots policy features.");
         Link(s,host,f,theme,"source","Review source repository link",a::HelpTarget::Source);
         break;
     case DesktopPage::Restart:{

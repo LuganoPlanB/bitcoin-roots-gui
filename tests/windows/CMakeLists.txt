@@ -12,7 +12,8 @@ if(MINGW)
 endif()
 
 add_test(NAME roots_gui.windows.build_contract
-  COMMAND "${Python3_EXECUTABLE}" -B "${PROJECT_SOURCE_DIR}/tests/build/command_contract.py" "$<TARGET_FILE:roots-gui>")
+  COMMAND "${Python3_EXECUTABLE}" -B "${PROJECT_SOURCE_DIR}/tests/build/command_contract.py"
+    "$<TARGET_FILE:roots-gui>" "${ROOTS_GUI_VERSION}")
 add_test(NAME roots_gui.windows.rpc
   COMMAND "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_SOURCE_DIR}/rpc.py" "$<TARGET_FILE:roots_gui_windows_rpc>")
 set_tests_properties(roots_gui.windows.build_contract roots_gui.windows.rpc PROPERTIES TIMEOUT 30)

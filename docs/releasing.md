@@ -3,7 +3,8 @@
 Run the **Release** workflow from GitHub Actions on `main` after the
 **Standalone GUI**, **Native Windows GUI**, and **Apple Silicon GUI** push
 workflows succeed. Leave **publish** unchecked to preview the version and the
-three selected build runs in the job summary. Check it to publish the release.
+three candidate CI runs in the job summary. Check it to build and publish the
+release.
 
 ```sh
 gh workflow run release.yml --ref main -f publish=false
@@ -21,17 +22,19 @@ these packages and a `SHA256SUMS` file that covers all three.
 | `bitcoin-roots-gui-macos-arm64.zip` | Ad hoc signed `Bitcoin Roots.app` for Apple Silicon on macOS 15 or later, with dependency notices. |
 
 Each run binds version calculation, packages, and tagging to its exact
-`main` commit. Package selection uses the latest successful result and
-artifact IDs from each platform's latest push run for that commit.
-Publication checks these IDs and the branch tip again after uploading.
-If a package expired, rerun its build workflow for the same commit. If
-`main` advances, dispatch again after the new commit's CI succeeds.
+`main` commit. Once the latest push CI and its artifacts qualify the candidate,
+the Release workflow builds all three packages with the calculated version.
+Each packaging job checks the installed executable's version before uploading
+its artifact. Publication downloads those specific artifacts from the same
+Release run and rechecks candidate CI and the branch tip after uploading.
+If a candidate CI artifact expired, rerun its build workflow for the same
+commit. If `main` advances, dispatch again after the new commit's CI succeeds.
 
 The workflow stages assets on a draft and publishes it after GitHub reports
 the expected size and SHA-256 for each upload. If an upload is interrupted,
-a rerun can resume the workflow's draft when its commit, selected artifacts,
-and previously uploaded bytes still match. Conflicting tags, drafts, and
-assets stop for manual inspection. A matching published release is a no-op.
+a rerun of the failed publication job can resume the draft when its commit,
+release artifacts, and previously uploaded bytes still match. Conflicting tags,
+drafts, and assets stop for manual inspection. A matching published release is a no-op.
 Releases run only through an explicit publish dispatch.
 
 The first release is `v0.1.0`. Subsequent releases use

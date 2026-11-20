@@ -91,6 +91,11 @@ beside a copied executable; font lookup is executable-relative, independent of
 its working directory. `--version` and `--build-contract` do not initialize a
 native window, connect to a node or open wallet metadata.
 
+About, `--version`, and the `gui_version` field in `--build-contract` show the
+GUI version embedded by CMake. Development builds default to `0.0.0-dev`.
+When rebuilding a release from source, pass the tag's numeric version at
+configure time, for example `-DROOTS_GUI_VERSION=0.3.1` for tag `v0.3.1`.
+
 The separate `ROOTS_GUI_LINUX_PACKAGE=ON` option creates the Debian x86-64
 relocatable distribution layout, including private OpenSSL/libsodium libraries.
 It requires tests disabled and the distro license files. Use

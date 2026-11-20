@@ -6,7 +6,15 @@ cmake_path(IS_PREFIX roots_gui_source_root "${roots_gui_build_root}" NORMALIZE r
 if(roots_gui_build_in_source)
   message(FATAL_ERROR "Use a build directory outside the source repository, for example: cmake -S . -B ../roots-gui-build")
 endif()
-project(RootsGui VERSION 0.1.0 LANGUAGES C CXX)
+set(ROOTS_GUI_VERSION "0.0.0-dev" CACHE STRING "GUI version embedded in the executable")
+set(roots_gui_version_number "(0|[1-9][0-9]*)")
+if(NOT ROOTS_GUI_VERSION STREQUAL "0.0.0-dev" AND
+   NOT ROOTS_GUI_VERSION MATCHES "^${roots_gui_version_number}[.]${roots_gui_version_number}[.]${roots_gui_version_number}$")
+  message(FATAL_ERROR "ROOTS_GUI_VERSION must be MAJOR.MINOR.PATCH (without v) or 0.0.0-dev")
+endif()
+string(REGEX REPLACE "-dev$" "" roots_gui_project_version "${ROOTS_GUI_VERSION}")
+project(RootsGui VERSION "${roots_gui_project_version}" LANGUAGES C CXX)
+configure_file(application/build_version.h.in generated/roots_gui_build_version.h @ONLY)
 if(APPLE)
   enable_language(OBJCXX)
 endif()
@@ -64,7 +72,7 @@ add_library(roots_gui_core STATIC domain/money.cpp domain/workflow.cpp applicati
   services/connection.cpp services/capabilities.cpp services/refresh.cpp services/history.cpp services/addresses.cpp services/wallet_lifecycle.cpp services/receive.cpp services/device_signers.cpp services/send_recipients.cpp services/send_batch.cpp services/send_analysis.cpp services/funding.cpp services/transaction_flow.cpp services/fees.cpp services/rescan.cpp services/transaction_documents.cpp services/camera.cpp adapters/protocol/qr.cpp adapters/protocol/qr_image.c
   third_party/qr/nayuki/qrcodegen.c third_party/qr/quirc/quirc.c third_party/qr/quirc/identify.c
   third_party/qr/quirc/decode.c third_party/qr/quirc/version_db.c adapters/protocol/public_wallet.cpp adapters/protocol/transaction.cpp adapters/protocol/offline_draft.cpp adapters/rpc/json.cpp adapters/rpc/transport.cpp adapters/storage/metadata.cpp adapters/storage/protected_file.cpp)
-target_include_directories(roots_gui_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(roots_gui_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_sources(roots_gui_core PRIVATE adapters/protocol/message.cpp)
 target_sources(roots_gui_core PRIVATE adapters/protocol/download_format.cpp services/download_verification.cpp)
 target_sources(roots_gui_core PRIVATE adapters/storage/metadata_archive.cpp)
@@ -135,7 +143,9 @@ if(APPLE)
   set_target_properties(roots-gui PROPERTIES
     MACOSX_BUNDLE TRUE OUTPUT_NAME "Bitcoin Roots"
     MACOSX_BUNDLE_BUNDLE_NAME "Bitcoin Roots"
-    MACOSX_BUNDLE_GUI_IDENTIFIER org.bitcoinroots.RootsGui)
+    MACOSX_BUNDLE_GUI_IDENTIFIER org.bitcoinroots.RootsGui
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}")
   set_source_files_properties(${roots_gui_font_files} PROPERTIES
     MACOSX_PACKAGE_LOCATION "Resources/roots-gui-assets/fonts")
   target_sources(roots-gui PRIVATE ${roots_gui_font_files})
@@ -192,7 +202,8 @@ elseif(ROOTS_GUI_BUILD_TESTS)
     set_tests_properties(roots_gui.download.verify PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE LABELS "roots-gui;model;roots-gui.model")
   endif()
   add_test(NAME roots_gui.build_contract
-    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/build/command_contract.py" "$<TARGET_FILE:roots-gui>")
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/build/command_contract.py"
+      "$<TARGET_FILE:roots-gui>" "${ROOTS_GUI_VERSION}")
   set_tests_properties(roots_gui.build_contract PROPERTIES TIMEOUT 30 LABELS "roots-gui;build;boundary")
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(X11 REQUIRED)

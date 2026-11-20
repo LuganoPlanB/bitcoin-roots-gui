@@ -34,7 +34,8 @@ def find_window(user32, pid):
 
 
 def main():
-    stage, mesa = map(Path, sys.argv[1:3])
+    stage_arg, mesa_arg, gui_version = sys.argv[1:]
+    stage, mesa = Path(stage_arg), Path(mesa_arg)
     user32 = c.WinDLL("user32", use_last_error=True)
     user32.GetWindowThreadProcessId.argtypes = [w.HWND, c.POINTER(w.DWORD)]
     user32.IsWindowVisible.argtypes = [w.HWND]
@@ -52,7 +53,8 @@ def main():
             "PATH": str(Path(os.environ["SystemRoot"]) / "System32"),
         }
         subprocess.run(
-            [sys.executable, "-B", str(Path(__file__).parents[1] / "build" / "command_contract.py"), str(binary)],
+            [sys.executable, "-B", str(Path(__file__).parents[1] / "build" / "command_contract.py"),
+             str(binary), gui_version],
             env=env,
             cwd=cwd,
             timeout=15,

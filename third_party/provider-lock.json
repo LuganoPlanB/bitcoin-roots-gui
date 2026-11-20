@@ -22,7 +22,7 @@
       },
       {
         "path": "patches/libwally-1.6.1-mingw-ssize.patch",
-        "sha256": "8ff23d180555edd0129a1113739a0c2001b356a9904a2b1c391a4e0e47610760"
+        "sha256": "902218e7185c2c2389162baebd1533ddf82a42a32503ee9462ac4f42eddb481a"
       }
     ]
   },

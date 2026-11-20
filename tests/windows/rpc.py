@@ -26,7 +26,7 @@ class Fixture(BaseHTTPRequestHandler):
             self.send_error(400)
             return
         reply = (
-            '{"result":{"amount":0.00000001},"error":null,"id":'
+            '{"jsonrpc":"2.0","result":{"amount":0.00000001},"id":'
             + json.dumps(body["id"])
             + "}"
         ).encode()

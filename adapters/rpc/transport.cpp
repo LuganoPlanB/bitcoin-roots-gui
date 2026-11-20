@@ -97,7 +97,7 @@ Credentials::Credentials(Credentials&& other) noexcept : username(std::move(othe
 Credentials::~Credentials() { Clear(username); Clear(password); }
 std::optional<Credentials> CookieCredentials::Resolve(const CredentialReference& ref, std::string_view)
 {
-    if (ref.kind != Authentication::Cookie) return {};
+    if (ref.kind != Authentication::Cookie || !ValidUtf8(ref.reference)) return {};
     const auto path = std::filesystem::u8path(ref.reference);
     if (!path.is_absolute()) return {};
     SecretBuffer bytes;

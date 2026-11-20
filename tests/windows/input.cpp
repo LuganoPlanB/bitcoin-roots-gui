@@ -54,8 +54,12 @@ struct Probe : platform::NativeObserver {
                 different += frame.rgba[at] != frame.rgba[0] || frame.rgba[at+1] != frame.rgba[1] || frame.rgba[at+2] != frame.rgba[2];
             Check(frame.decorated && frame.font_texture && different > 100, "Win32 OpenGL draws visible content");
             constexpr std::string_view text = "Roots \xCE\x94 clipboard";
+            input.BeginFrame();
             Check(input.Copy(text) && input.RequestInspection(11), "Windows Unicode clipboard write and read");
+            input.EndFrame();
+            input.BeginFrame();
             Check(input.Paste(11, "", 0, 0, 0, 256) == text, "Unicode clipboard content reaches the intended editor");
+            input.EndFrame();
             input.EnterProtectedEditor(12);
             Check(!input.Copy("protected editor"), "protected editor cannot publish clipboard text");
             input.LeaveEditor();

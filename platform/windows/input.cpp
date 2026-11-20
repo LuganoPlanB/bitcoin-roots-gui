@@ -83,6 +83,7 @@ struct NativeInput::Impl {
     std::string view;
     uint32_t editor{}, paste_target{};
     std::string paste;
+    bool paste_seen{}, paste_sensitive{}, paste_protected{};
     uint64_t file_id{};
     bool save{};
     const wchar_t* title{};
@@ -106,19 +107,21 @@ struct NativeInput::Impl {
         if (!owns_copy) return;
         const Clipboard clipboard(window);
         if (!clipboard.opened) return;
-        if (GetClipboardOwner() == window && GetClipboardSequenceNumber() == copy_sequence)
-            EmptyClipboard();
+        if (GetClipboardOwner() == window && GetClipboardSequenceNumber() == copy_sequence && !EmptyClipboard()) return;
         owns_copy = copy_sensitive = false;
     }
 
-    bool ReadFor(uint32_t target)
+    bool ReadFor(uint32_t target, bool sensitive, bool protected_editor)
     {
-        if (!target || !status.clipboard || (hidden && editor_sensitive && !editor_protected)) return false;
+        if (!target || !status.clipboard || (hidden && sensitive && !protected_editor)) return false;
         ClearPaste();
         paste = ReadClipboard(window);
         ++status.clipboard_reads;
         if (paste.empty()) return false;
         paste_target = target;
+        paste_seen = true;
+        paste_sensitive = sensitive;
+        paste_protected = protected_editor;
         return true;
     }
 
@@ -167,8 +170,8 @@ void NativeInput::Pump()
         impl->choice = {c::NativeOutcome::Chosen, std::move(name), {}};
 }
 
-void NativeInput::BeginFrame() {}
-void NativeInput::EndFrame() { impl->ClearPaste(); }
+void NativeInput::BeginFrame() { impl->paste_seen = false; }
+void NativeInput::EndFrame() { if (!impl->paste_seen) impl->ClearPaste(); }
 void NativeInput::BeginView(std::string_view scope)
 {
     if (impl->view != scope) impl->ClearPaste();
@@ -178,7 +181,7 @@ void NativeInput::Privacy(bool hidden)
 {
     impl->hidden = hidden;
     if (hidden && impl->copy_sensitive) impl->ClearOwnCopy();
-    if (hidden && !impl->editor_protected) impl->ClearPaste();
+    if (hidden && impl->paste_sensitive && !impl->paste_protected) impl->ClearPaste();
 }
 void NativeInput::PrivacyLock()
 {
@@ -194,15 +197,18 @@ bool NativeInput::Copy(std::string_view text, bool sensitive)
     if (!impl->status.clipboard || impl->editor_protected || (impl->hidden && sensitive)) return false;
     auto value = Wide(text);
     if (value.empty()) return false;
-    const Clipboard clipboard(impl->window);
-    bool accepted = clipboard.opened && EmptyClipboard();
-    if (accepted && sensitive) {
-        // Keep sensitive writes out of Windows clipboard history and sync.
-        const auto exclude = RegisterClipboardFormatW(L"ExcludeClipboardContentFromMonitorProcessing");
-        const DWORD marker = 0;
-        accepted = exclude && PublishClipboard(exclude, &marker, sizeof(marker));
+    bool accepted;
+    {
+        const Clipboard clipboard(impl->window);
+        accepted = clipboard.opened && EmptyClipboard();
+        if (accepted && sensitive) {
+            // Keep sensitive writes out of Windows clipboard history and sync.
+            const auto exclude = RegisterClipboardFormatW(L"ExcludeClipboardContentFromMonitorProcessing");
+            const DWORD marker = 0;
+            accepted = exclude && PublishClipboard(exclude, &marker, sizeof(marker));
+        }
+        if (accepted) accepted = PublishClipboard(CF_UNICODETEXT, value.c_str(), (value.size() + 1) * sizeof(wchar_t));
     }
-    if (accepted) accepted = PublishClipboard(CF_UNICODETEXT, value.c_str(), (value.size() + 1) * sizeof(wchar_t));
     if (sensitive) SecureZeroMemory(value.data(), value.size() * sizeof(wchar_t));
     if (!accepted) {
         impl->status.notice = "Copy could not acquire the Windows clipboard.";
@@ -217,7 +223,7 @@ bool NativeInput::Copy(std::string_view text, bool sensitive)
 }
 const char* NativeInput::ClipboardForPaste()
 {
-    impl->ReadFor(impl->editor);
+    impl->ReadFor(impl->editor, impl->editor_sensitive, impl->editor_protected);
     return ""; // The bounded editor callback consumes the pending value.
 }
 void NativeInput::EnterEditor(uint32_t id, bool sensitive)
@@ -246,7 +252,7 @@ std::optional<std::string> NativeInput::Paste(uint32_t id, std::string_view valu
     impl->status.notice.clear();
     return std::exchange(impl->paste, {});
 }
-bool NativeInput::RequestInspection(uint32_t id) { return !impl->paste_target && impl->ReadFor(id); }
+bool NativeInput::RequestInspection(uint32_t id) { return !impl->paste_target && impl->ReadFor(id, false, false); }
 bool NativeInput::InspectionPending(uint32_t id) const { return id && id == impl->paste_target; }
 bool NativeInput::FileChooserAvailable() const { return impl->status.file_dialog && !NativeDialogActive(); }
 bool NativeInput::NativeDialogActive() const { return impl->choice.outcome == c::NativeOutcome::Pending; }

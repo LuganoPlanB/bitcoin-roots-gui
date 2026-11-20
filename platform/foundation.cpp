@@ -361,6 +361,7 @@ ui::shell::Facts DrawShellFrame(NativeHost& host,ui::shell::State& workspace,app
     }
     const auto native_notice=host.InputState().notice;if(!native_notice.empty())workspace.notice=native_notice;
     if(facts.appearance_requested>=0)host.SetAppearance(facts.appearance_requested);
+    if(facts.interface_size_requested)host.SetInterfaceSize(facts.interface_size_requested);
     return facts;
 }
 std::string BuildInfo()

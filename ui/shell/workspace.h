@@ -621,6 +621,7 @@ struct Facts {
     bool appearance_notice_visible{};
     int appearance_notice_count{};
     int appearance_requested{-1};
+    int interface_size_requested{};
     bool preferences_visible{};
     std::map<std::string,components::ItemFacts> preferences;
     std::map<std::string,components::ItemFacts> tools;

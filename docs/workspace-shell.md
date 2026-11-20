@@ -141,6 +141,9 @@ macOS work). Ctrl+1..6 routes sections; tabs work with keyboard activation and
 left/right movement. Hide Amounts and the BTC/sats/automatic unit cycle are
 immediate presentation changes. Appearance choices use the host's actual saved
 Light/Dark/System path, acknowledging save failure; production time stays native.
+In **File → Preferences → Appearance**, **Interface size** scales text and layout
+live from 50% to 200%. **Reset size** restores 100%. The next launch uses the
+saved size independently of the theme and wallet preferences.
 
 Other menu routes query typed host availability with document/section context;
 registered handlers receive typed requests.

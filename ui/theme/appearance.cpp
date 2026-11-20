@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Plan-B Foundation
 // Distributed under the MIT software license, see the accompanying COPYING file.
 #include "ui/theme/appearance.h"
+#include <charconv>
 #include <fstream>
 #include <system_error>
 namespace roots::gui::ui::theme {
@@ -17,23 +18,24 @@ std::optional<Appearance> ParseAppearance(std::string_view value)
     return {};
 }
 bool IsDark(Appearance choice, bool system_dark) { return choice == Appearance::Dark || (choice == Appearance::System && system_dark); }
-AppearanceLoad LoadAppearance(const std::filesystem::path& path)
+namespace {
+template <typename Result, typename Parse>
+Result LoadPreference(const std::filesystem::path& path, Parse parse)
 {
     std::error_code ec;
     if (!std::filesystem::exists(path, ec) && !ec) return {};
     if (ec || !std::filesystem::is_regular_file(path, ec) || ec || std::filesystem::file_size(path, ec) > 16 || ec)
-        return {Appearance::Light, false};
+        return {.valid = false};
     std::ifstream file(path, std::ios::binary);
     std::string value{std::istreambuf_iterator<char>(file), {}};
-    if (!file || file.bad()) return {Appearance::Light, false};
+    if (!file || file.bad()) return {.valid = false};
     if (!value.empty() && value.back() == '\n') value.pop_back();
-    const auto parsed = ParseAppearance(value);
-    return {parsed.value_or(Appearance::Light), parsed.has_value()};
+    if (const auto parsed = parse(value)) return {*parsed, true};
+    return {.valid = false};
 }
-bool SaveAppearance(const std::filesystem::path& path, Appearance choice)
+bool SavePreference(const std::filesystem::path& path, std::string_view value)
 {
-    const auto id = AppearanceId(choice);
-    if (id.empty() || path.empty()) return false;
+    if (value.empty() || path.empty()) return false;
     std::error_code ec;
     std::filesystem::create_directories(path.parent_path(), ec);
     if (ec) return false;
@@ -41,10 +43,38 @@ bool SaveAppearance(const std::filesystem::path& path, Appearance choice)
     auto pending = path; pending += ".pending";
     if (std::filesystem::is_symlink(pending, ec)) return false;
     std::ofstream file(pending, std::ios::binary | std::ios::trunc);
-    file << id << '\n'; file.close();
+    file << value << '\n'; file.close();
     if (!file) return false;
     std::filesystem::rename(pending, path, ec);
     if (ec) { std::filesystem::remove(pending, ec); return false; }
     return true;
+}
+}
+
+AppearanceLoad LoadAppearance(const std::filesystem::path& path)
+{
+    return LoadPreference<AppearanceLoad>(path, ParseAppearance);
+}
+
+bool SaveAppearance(const std::filesystem::path& path, Appearance choice)
+{
+    return SavePreference(path, AppearanceId(choice));
+}
+
+InterfaceSizeLoad LoadInterfaceSize(const std::filesystem::path& path)
+{
+    return LoadPreference<InterfaceSizeLoad>(path, [](std::string_view value) -> std::optional<int> {
+        int percent{};
+        const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), percent);
+        if (error != std::errc{} || end != value.data() + value.size()
+            || percent < MIN_INTERFACE_SIZE || percent > MAX_INTERFACE_SIZE) return {};
+        return percent;
+    });
+}
+
+bool SaveInterfaceSize(const std::filesystem::path& path, int percent)
+{
+    return percent >= MIN_INTERFACE_SIZE && percent <= MAX_INTERFACE_SIZE
+        && SavePreference(path, std::to_string(percent));
 }
 }

@@ -97,7 +97,9 @@ Credentials::Credentials(Credentials&& other) noexcept : username(std::move(othe
 Credentials::~Credentials() { Clear(username); Clear(password); }
 std::optional<Credentials> CookieCredentials::Resolve(const CredentialReference& ref, std::string_view)
 {
-    if (ref.kind != Authentication::Cookie || !std::filesystem::path(ref.reference).is_absolute()) return {};
+    if (ref.kind != Authentication::Cookie) return {};
+    const auto path = std::filesystem::u8path(ref.reference);
+    if (!path.is_absolute()) return {};
     SecretBuffer bytes;
 #ifndef _WIN32
     const int fd = open(ref.reference.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
@@ -112,12 +114,17 @@ std::optional<Credentials> CookieCredentials::Resolve(const CredentialReference&
     if (n <= 0 || n != info.st_size) return {};
 #else
     std::error_code ec;
-    if (!std::filesystem::is_regular_file(ref.reference, ec)) return {};
-    std::ifstream file(ref.reference, std::ios::binary);
+    if (!std::filesystem::is_regular_file(path, ec)) return {};
+    std::ifstream file(path, std::ios::binary);
     for (char c; bytes.value.size() <= 4096 && file.get(c);) bytes.value += c;
     if (!file.eof() || bytes.value.empty() || bytes.value.size() > 4096) return {};
 #endif
-    if (!bytes.value.empty() && bytes.value.back() == '\n') bytes.value.pop_back();
+    if (!bytes.value.empty() && bytes.value.back() == '\n') {
+        bytes.value.pop_back();
+#ifdef _WIN32
+        if (!bytes.value.empty() && bytes.value.back() == '\r') bytes.value.pop_back();
+#endif
+    }
     const auto colon = bytes.value.find(':');
     if (colon == std::string::npos || !colon || colon + 1 == bytes.value.size() || !CleanSecret(bytes.value)) return {};
     return Credentials(bytes.value.substr(0, colon), bytes.value.substr(colon + 1));

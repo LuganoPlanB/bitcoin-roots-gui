@@ -387,10 +387,15 @@ int Run(std::optional<RestartContext> resumed)
 {
     NativeOptions options;
     options.desktop_ports=NativeDesktopPorts();
+#if defined(_WIN32)
+    if (const auto* local = _wgetenv(L"LOCALAPPDATA"); local && std::filesystem::path(local).is_absolute())
+        options.appearance_file = std::filesystem::path(local) / "Bitcoin Roots" / "appearance";
+#else
     if (const auto* config=std::getenv("XDG_CONFIG_HOME"); config && std::filesystem::path(config).is_absolute())
         options.appearance_file=std::filesystem::path(config)/"roots-gui/appearance";
     else if (const auto* home=std::getenv("HOME"); home && std::filesystem::path(home).is_absolute())
         options.appearance_file=std::filesystem::path(home)/".config/roots-gui/appearance";
+#endif
     struct ShellRequests final:app::Requests {
         NativeHost* host{};ui::components::SemanticExchange* semantics{};
         app::RecoverySession* recovery{};app::DocumentRegistry* documents{};
@@ -466,8 +471,10 @@ int Run(std::optional<RestartContext> resumed)
     } requests;
     ui::shell::State workspace;
     std::filesystem::path recovery_file;
+#if !defined(_WIN32)
     if(const auto* data=std::getenv("XDG_DATA_HOME");data && std::filesystem::path(data).is_absolute())recovery_file=std::filesystem::path(data)/"roots-gui/metadata.sqlite";
     else if(const auto* home=std::getenv("HOME");home && std::filesystem::path(home).is_absolute())recovery_file=std::filesystem::path(home)/".local/share/roots-gui/metadata.sqlite";
+#endif
     app::RecoverySession recovery(recovery_file);recovery.Start();
     requests.recovery=&recovery;requests.documents=&workspace.documents;requests.workspace=&workspace;
     requests.restart_available=[&workspace,&requests]{return GuiRestartAvailability(workspace,requests);};

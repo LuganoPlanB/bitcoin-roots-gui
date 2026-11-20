@@ -8,6 +8,9 @@
 #include <utility>
 #if !defined(_WIN32)
 #include <unistd.h>
+#else
+#include <windows.h>
+#include <shellapi.h>
 #endif
 #if defined(__linux__)
 #include <gio/gio.h>
@@ -191,6 +194,12 @@ DesktopPorts NativeDesktopPorts()
     ports.notify=GenericNotification;
     ports.browser=[](app::HelpTarget target,std::string_view url){
         return app::ConfirmedHelpUrl(target,url) && g_app_info_launch_default_for_uri(std::string(url).c_str(),nullptr,nullptr);
+    };
+#elif defined(_WIN32)
+    ports.browser=[](app::HelpTarget target, std::string_view url) {
+        if (!app::ConfirmedHelpUrl(target, url)) return false;
+        const std::wstring address(url.begin(), url.end()); // ConfirmedHelpUrl requires a fixed ASCII URL.
+        return reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, L"open", address.c_str(), nullptr, nullptr, SW_SHOWNORMAL)) > 32;
     };
 #endif
     return ports;

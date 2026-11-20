@@ -165,7 +165,7 @@ uint64_t NativeInput::ChooseRpcCookie(){return impl->Choose({},false,"--title=Ch
 c::FileChoice NativeInput::PollFile(uint64_t id){impl->Owner();if(id!=impl->file_id)return {c::NativeOutcome::Stale,{},"File selection is no longer current."};impl->file_seen=true;return impl->choice;}
 InputStatus NativeInput::Status() const {impl->Owner();auto status=impl->status;status.callbacks=impl->jobs;return status;}
 bool NativeInput::Close(){return impl->Close();}
-#else
+#elif !defined(_WIN32)
 struct NativeInput::Impl {InputStatus status;};
 bool NativeInput::RequestInspection(uint32_t){return false;}
 bool NativeInput::InspectionPending(uint32_t) const{return false;}

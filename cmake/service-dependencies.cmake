@@ -24,6 +24,8 @@ function(roots_gui_add_service_dependencies source_dir)
     # Linux system bundle, never the build sysroot's certificate files.
     set(CURL_CA_BUNDLE "/etc/ssl/certs/ca-certificates.crt" CACHE FILEPATH
       "Runtime CA bundle for the static SDL3 executable")
+  elseif(WIN32)
+    set(CURL_CA_NATIVE ON CACHE BOOL "Use the Windows certificate store by default")
   endif()
   foreach(feature CURL_ZLIB CURL_BROTLI CURL_ZSTD USE_NGHTTP2 CURL_USE_LIBPSL
       CURL_USE_LIBSSH2 CURL_USE_LIBSSH CURL_USE_GSSAPI CURL_USE_LIBIDN2)

@@ -26,8 +26,8 @@ The Windows desktop build has a native clipboard, file dialogs and a default
 browser handoff for approved Help links. The RPC cookie picker returns a
 Unicode file path. Transactions and wallet services still use the existing
 RPC boundaries. The protected metadata and recovery store, transaction file
-read/write adapters, Windows UI Automation, camera, power and notifications
-remain outside this Windows profile.
+read/write adapters, CSV file exports, Windows UI Automation, camera, power
+and notifications remain outside this Windows profile.
 
 The **Native Windows GUI** workflow runs on Windows Server x64. It checks
 an authenticated loopback RPC, Unicode clipboard, native dialog cancellation,

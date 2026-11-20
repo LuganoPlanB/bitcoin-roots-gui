@@ -118,15 +118,19 @@ void DrawCoins(State& s,a::Requests& host,Facts& f,const imkit::Theme& theme,flo
     Button(s,f,"sort-value","Sort value",theme,!s.privacy.hidden,[&s,id]{if(!Usable(s,id))return false;auto& p=s.documents.Find(id)->coins;p.descending=p.by_value?!p.descending:true;p.by_value=true;s.coins.at(id).reveal=true;return true;});
     theme::SameLineForAction("Sort date");
     Button(s,f,"sort-date","Sort date",theme,true,[&s,id]{auto* d=s.documents.Find(id);if(!d || s.documents.ActiveId()!=id)return false;d->coins.descending=!d->coins.by_value?!d->coins.descending:true;d->coins.by_value=false;s.coins.at(id).reveal=true;return true;});
+#if !defined(_WIN32)
     theme::SameLineForAction("Export CSV");
     Button(s,f,"csv","Export CSV",theme,Usable(s,id) && c::native_input && c::native_input->FileChooserAvailable() && !r.file_dialog,[&s,id]{auto* d=s.documents.Find(id);auto& r=s.coins.at(id);if(!Usable(s,id) || !r.inventory || !c::native_input)return false;auto rows=r.inventory->Ordered(d->coins.by_value,d->coins.descending);auto csv=a::CoinCsv(*r.inventory,rows,r.labels,false);if(!csv){r.error="CSV was not saved: invalid text or snapshot bounds. Drafts and original files retained.";return false;}r.export_data=std::move(*csv);r.export_scope=Scope(s,id);r.file_dialog=c::native_input->ChooseFile("coins.csv",true);return bool(r.file_dialog);});
+#endif
     if(s.recovery){
         theme::SameLineForAction("Reload labels");
         Button(s,f,"reload-labels","Reload labels",theme,Usable(s,id),[&s,id]{return Usable(s,id) && LoadLabels(s,id);});
     }
     s.presentation.EndGroup();
     ImGui::PopStyleVar();
+#if !defined(_WIN32)
     if(r.file_dialog){if(!Usable(s,id) || r.export_scope!=Scope(s,id)){r.export_data.clear();r.file_dialog=0;}else if(c::native_input){auto choice=c::native_input->PollFile(r.file_dialog);if(choice.outcome!=c::NativeOutcome::Pending){if(choice.outcome==c::NativeOutcome::Chosen)a::WriteCoinCsv(choice.path,r.export_data,r.error);else if(choice.outcome!=c::NativeOutcome::Cancelled)r.error="CSV was not saved; choose Export CSV to retry.";r.file_dialog=0;r.export_data.clear();}}}
+#endif
     if(!r.error.empty()){const auto error=s.privacy.hidden?"Coin operation details hidden":r.error;ImGui::TextWrapped("%s",error.c_str());s.presentation.Annotate("coin-error","Coin operation status",error,c::ax::SemanticRole::Alert);}for(const auto& [key,draft]:d->coins.drafts)if(!draft.error.empty()){const auto error=s.privacy.hidden?"Coin label save failed; details hidden":draft.error;ImGui::TextWrapped("%s",error.c_str());s.presentation.Annotate(("coin-label-error-"+key).c_str(),"Coin label save failed",error,c::ax::SemanticRole::Alert);}
     const auto& projection=*r.projection;const auto& rows=projection.rows;f.coin_order=projection.keys;const auto summary=s.privacy.hidden?std::string("Selection totals hidden"):(std::to_string(totals.selected)+" selected / "+std::to_string(totals.present)+" observed; value "+(totals.selected_value?totals.selected_value->btc()+" BTC":"Unknown")+"; eligible "+(totals.selected_eligible?totals.selected_eligible->btc()+" BTC":"Unknown"));
     const float width=ImGui::GetContentRegionAvail().x;

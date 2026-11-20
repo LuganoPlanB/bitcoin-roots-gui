@@ -1,0 +1,11 @@
+diff --git a/_cmake/config.h.in b/_cmake/config.h.in
+--- a/_cmake/config.h.in
++++ b/_cmake/config.h.in
+@@ -75,4 +75,6 @@
+-#if defined (_WIN32) && !defined(_SSIZE_T_DECLARED) && !defined(_ssize_t) && !defined(ssize_t)
++#if defined(__MINGW32__)
++#include <sys/types.h>
++#elif defined (_WIN32) && !defined(_SSIZE_T_DECLARED) && !defined(_ssize_t) && !defined(ssize_t)
+ #if defined(_WIN64)
+ typedef __int64 ssize_t;
+ #else

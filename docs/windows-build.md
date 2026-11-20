@@ -11,6 +11,9 @@ cmake --build ../roots-gui-win --target roots-gui -j 2
 cmake --install ../roots-gui-win --prefix "$(cygpath -m "$PWD/../roots-gui-win-stage")"
 ```
 
+The build applies a checksum-pinned libwally portability patch during offline
+source preparation. It uses the MinGW system definition of `ssize_t`.
+
 Run `bin/roots-gui.exe` from the installed directory. Keep the DLLs and
 `roots-gui-assets/fonts` beside it. Font lookup uses the executable location,
 so Windows Explorer and other working directories work. Appearance

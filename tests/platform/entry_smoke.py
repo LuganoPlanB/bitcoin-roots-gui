@@ -141,7 +141,8 @@ def main():
             record.update(workingDirectory=str(working), relocatedBinary=str(binary))
             with (args.output / "application.log").open("wb") as log:
                 process = subprocess.Popen(
-                    [str(binary)], cwd=working, stdout=log, stderr=subprocess.STDOUT
+                    [str(binary)], cwd=working, env=os.environ | {"HOME": str(folder)},
+                    stdout=log, stderr=subprocess.STDOUT
                 )
                 record["appPid"] = process.pid
                 deadline = time.monotonic() + 10

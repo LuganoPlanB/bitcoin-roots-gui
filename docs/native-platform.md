@@ -1,9 +1,9 @@
 # Native bootstrap and platform evidence
 
 Default `roots-gui` startup creates a decorated OS window and the production
-empty workspace draw entry. It shows the product name, offline status and a
-keyboard/mouse reachable Close action. Wallet opening, navigation and services
-remain later work; this screen makes no connection and starts no daemon.
+workspace. If a default local cookie and TCP listener are detected, it opens
+the [prefilled Server form](server-connection.md). Test Connection and Apply
+remain explicit user actions. The GUI starts no daemon.
 
 `NativeHost` in the default build owns GLFW, the OpenGL context, ImGui and the stock pinned GLFW and
 OpenGL3 backends on its creating thread. Only one host may exist at a time.

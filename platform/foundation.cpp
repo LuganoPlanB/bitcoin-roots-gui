@@ -482,7 +482,19 @@ int Run(std::optional<RestartContext> resumed)
     app::RecoverySession recovery(recovery_file);recovery.Start();
     requests.recovery=&recovery;requests.documents=&workspace.documents;requests.workspace=&workspace;
     requests.restart_available=[&workspace,&requests]{return GuiRestartAvailability(workspace,requests);};
-    if(!resumed && !recovery.Pending() && !recovery.Locked())ui::shell::BeginOnboarding(workspace,ui::shell::OnboardingPage::Introduction,requests);
+    if (!resumed && !recovery.Pending() && !recovery.Locked()) {
+        auto candidate = workspace.server.Candidate();
+        if (auto local = rpc::FindLocalRpcProfile(candidate.connection.port);
+            local && local->credential.reference.size() < workspace.server.credential.text.size()) {
+            candidate.connection = std::move(*local);
+            workspace.server.Load(candidate);
+            workspace.server.suggested_cookie = candidate.connection.credential.reference;
+            ui::OpenServer(workspace.server, requests.connection);
+            workspace.server.notice = "Local RPC port and default cookie found. Test Connection to verify the node.";
+        } else {
+            ui::shell::BeginOnboarding(workspace, ui::shell::OnboardingPage::Introduction, requests);
+        }
+    }
     struct SemanticLifetime {ui::components::SemanticExchange& exchange;~SemanticLifetime(){exchange.Close();}} lifetime{workspace.presentation.exchange};
     requests.semantics=&workspace.presentation.exchange;
     options.accessibility=&workspace.presentation.exchange;

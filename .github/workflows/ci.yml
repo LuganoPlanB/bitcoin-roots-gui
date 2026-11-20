@@ -75,7 +75,8 @@ jobs:
         run: |
           set -Eeuo pipefail
           cmake -S . -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=Release -DROOTS_GUI_BUILD_TESTS=ON 2>&1 | tee "$RUNNER_TEMP/gui-configure.log"
-          cmake --build "$BUILD_DIR" --target roots-gui roots_gui_model_tests -j 2 2>&1 | tee "$RUNNER_TEMP/gui-models.log"
+          cmake --build "$BUILD_DIR" --target roots-gui roots_gui_model_tests roots_gui_local_rpc_probe -j 2 2>&1 | tee "$RUNNER_TEMP/gui-models.log"
+          ctest --test-dir "$BUILD_DIR" -R '^roots_gui[.]rpc[.]local_discovery$' --output-on-failure --no-tests=error
           cmake --install "$BUILD_DIR" --prefix "$STAGE_DIR" 2>&1 | tee "$RUNNER_TEMP/gui-install.log"
           python3 tests/build/command_contract.py "$STAGE_DIR/bin/roots-gui" 0.0.0-dev
           test -f "$STAGE_DIR/bin/roots-gui-assets/fonts/Inter-Regular.ttf"

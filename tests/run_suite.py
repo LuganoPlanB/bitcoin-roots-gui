@@ -66,6 +66,7 @@ SUITES = {
                     "json",
                     "transport",
                     "capabilities",
+                    "local_discovery",
                     "refresh",
                     "history",
                     "history_bounds",

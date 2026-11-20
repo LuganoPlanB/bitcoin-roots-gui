@@ -60,7 +60,7 @@ jobs:
             -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
             -DCMAKE_PREFIX_PATH="$sodium;$openssl" -DOPENSSL_ROOT_DIR="$openssl" \
             -DROOTS_GUI_BUILD_TESTS=ON
-          cmake --build "$build" --target roots-gui roots_gui_macos_window -j 2
+          cmake --build "$build" --target roots-gui roots_gui_macos_window roots_gui_local_rpc_probe -j 2
           ctest --test-dir "$build" --no-tests=error --output-on-failure --verbose
           cmake --install "$build" --prefix "$stage"
           licenses="$stage/share/doc/roots-gui/licenses"

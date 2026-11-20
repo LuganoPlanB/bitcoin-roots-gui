@@ -14,7 +14,7 @@ struct ServerPanel {
     ServerSource source{ServerSource::DirectRpc};
     components::Edit host{"127.0.0.1"}, port{"8332"}, credential, wallet, ca, proxy_host{"127.0.0.1"}, proxy_port{"9050"};
     components::Edit genesis{"000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"};
-    std::string notice;
+    std::string notice, suggested_cookie;
     uint64_t scope_revision{}, scope_session{};
     uint64_t cookie_dialog{}, cookie_revision{}, cookie_session{};
     ServerCandidate Candidate() const;

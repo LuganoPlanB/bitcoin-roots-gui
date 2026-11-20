@@ -28,6 +28,32 @@ struct CurlRuntime {
     CURLcode status{curl_global_init(CURL_GLOBAL_DEFAULT)};
     ~CurlRuntime() { if (status == CURLE_OK) curl_global_cleanup(); }
 };
+const CurlRuntime& Runtime()
+{
+    static const CurlRuntime runtime;
+    return runtime;
+}
+std::filesystem::path DefaultCookieFile()
+{
+    namespace fs = std::filesystem;
+    const auto find = [](const auto* directory, const fs::path& suffix) -> fs::path {
+        if (!directory) return {};
+        const fs::path root(directory);
+        if (!root.is_absolute()) return {};
+        const auto path = root / suffix;
+        std::error_code error;
+        return fs::is_regular_file(path, error) ? path : fs::path{};
+    };
+#if defined(_WIN32)
+    auto legacy = find(_wgetenv(L"APPDATA"), L"Bitcoin/.cookie");
+    if (!legacy.empty()) return legacy;
+    return find(_wgetenv(L"LOCALAPPDATA"), L"Bitcoin/.cookie");
+#elif defined(__APPLE__)
+    return find(std::getenv("HOME"), "Library/Application Support/Bitcoin/.cookie");
+#else
+    return find(std::getenv("HOME"), ".bitcoin/.cookie");
+#endif
+}
 std::string HostPort(std::string_view host, uint16_t port)
 {
     return (host.find(':') == std::string_view::npos ? std::string(host) : '[' + std::string(host) + ']') + ':' + std::to_string(port);
@@ -91,6 +117,32 @@ Error CurlError(CURLcode code)
     default: return Error::Connection;
     }
 }
+}
+std::optional<ConnectionProfile> FindLocalRpcProfile(uint16_t port)
+try
+{
+    if (!port) return {};
+    const auto cookie = DefaultCookieFile();
+    if (cookie.empty()) return {};
+    ConnectionProfile profile;
+    profile.port = port;
+    const auto path = cookie.u8string();
+    profile.credential.reference.assign(path.begin(), path.end());
+    if (!ValidConnectionProfile(profile) || !ValidUtf8(profile.credential.reference) || Runtime().status != CURLE_OK) return {};
+
+    std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> easy(curl_easy_init(), curl_easy_cleanup);
+    const auto url = "http://" + HostPort(profile.host, profile.port);
+    if (!easy ||
+        curl_easy_setopt(easy.get(), CURLOPT_URL, url.c_str()) != CURLE_OK ||
+        curl_easy_setopt(easy.get(), CURLOPT_PROXY, "") != CURLE_OK ||
+        curl_easy_setopt(easy.get(), CURLOPT_CONNECT_ONLY, 1L) != CURLE_OK ||
+        curl_easy_setopt(easy.get(), CURLOPT_NOSIGNAL, 1L) != CURLE_OK ||
+        curl_easy_setopt(easy.get(), CURLOPT_TIMEOUT_MS, 150L) != CURLE_OK ||
+        curl_easy_perform(easy.get()) != CURLE_OK) return {};
+    return profile;
+}
+catch (const std::filesystem::filesystem_error&) {
+    return {};
 }
 Credentials::Credentials(std::string user, std::string pass) : username(std::move(user)), password(std::move(pass)) {}
 Credentials::Credentials(Credentials&& other) noexcept : username(std::move(other.username)), password(std::move(other.password)) {}
@@ -205,8 +257,7 @@ Reply Transport::Call(const ConnectionProfile& profile,const Request& request,st
     // Refuse that configuration before initialization; never change process
     // environment from a worker or emit the supplied path in diagnostics.
     if (const auto* keylog = std::getenv("SSLKEYLOGFILE"); keylog && *keylog) return fail(Error::Configuration);
-    static CurlRuntime runtime;
-    if (runtime.status != CURLE_OK || !(curl_version_info(CURLVERSION_NOW)->features & CURL_VERSION_ASYNCHDNS)) return fail(Error::Configuration);
+    if (Runtime().status != CURLE_OK || !(curl_version_info(CURLVERSION_NOW)->features & CURL_VERSION_ASYNCHDNS)) return fail(Error::Configuration);
     const std::string origin = std::string(profile.tls ? "https://" : "http://") + HostPort(profile.host, profile.port);
     const std::string url = origin + (request.wallet ? "/wallet/" + EncodePath(*request.wallet) : "/");
     auto credential = m_credentials.Resolve(profile.credential, origin);

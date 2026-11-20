@@ -50,6 +50,7 @@ def main():
         cwd.mkdir()
         env = os.environ | {
             "LOCALAPPDATA": str(work / "profile"),
+            "APPDATA": str(work / "roaming"),
             "PATH": str(Path(os.environ["SystemRoot"]) / "System32"),
         }
         subprocess.run(

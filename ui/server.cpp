@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <charconv>
 #include <filesystem>
+#include <utility>
 
 namespace roots::gui::ui {
 namespace {
@@ -15,6 +16,10 @@ uint16_t Port(std::string_view text)
 {
     unsigned port{}; const auto parsed = std::from_chars(text.data(), text.data() + text.size(), port);
     return parsed.ec == std::errc{} && parsed.ptr == text.data() + text.size() && port > 0 && port <= 65535 ? uint16_t(port) : 0;
+}
+bool AbsoluteCookiePath(std::string_view path)
+{
+    return rpc::ValidUtf8(path) && std::filesystem::path(std::u8string(path.begin(), path.end())).is_absolute();
 }
 c::ItemFacts Last()
 {
@@ -139,7 +144,25 @@ ServerFacts DrawServer(ServerPanel& panel, ConnectionService& service, c::Presen
         ImGui::TextWrapped("%s",limits);
         presentation.Annotate("index-rpc-coverage","RPC history coverage",limits);
     }else{
-    const auto sync = [&panel, &service] { panel.notice.clear(); const bool accepted = service.SetDraft(panel.Candidate()); panel.scope_revision = service.Revision(); panel.scope_session = service.Session(); return accepted; };
+    const auto sync = [&panel, &service] {
+        panel.notice.clear();
+        auto candidate = panel.Candidate();
+        if (!panel.suggested_cookie.empty()) {
+            const auto& profile = candidate.connection;
+            const ConnectionProfile local;
+            if (profile.credential.reference != panel.suggested_cookie) {
+                panel.suggested_cookie.clear();
+            } else if (profile.host != local.host || profile.port != local.port || profile.tls || profile.proxy != ProxyKind::Direct) {
+                panel.suggested_cookie.clear();
+                panel.credential = c::Edit{};
+                candidate.connection.credential.reference.clear();
+            }
+        }
+        const bool accepted = service.SetDraft(std::move(candidate));
+        panel.scope_revision = service.Revision();
+        panel.scope_session = service.Session();
+        return accepted;
+    };
     const auto field = [&](const char* id, const char* label, c::Edit& edit, const char* hint = "") {
         imkit::BeginFormField(id, {label, hint, "", std::string_view(id) != "ca"}, {&theme});
         const bool changed = c::EditInput("###input", edit);
@@ -175,7 +198,7 @@ ServerFacts DrawServer(ServerPanel& panel, ConnectionService& service, c::Presen
             const auto choice=input->PollFile(panel.cookie_dialog);
             if(choice.outcome!=c::NativeOutcome::Pending){
                 panel.cookie_dialog=0;
-                if(choice.outcome==c::NativeOutcome::Chosen && std::filesystem::path(choice.path).is_absolute()
+                if(choice.outcome==c::NativeOutcome::Chosen && AbsoluteCookiePath(choice.path)
                     && panel.credential.SetExternalDraft(choice.path))sync();
                 else if(choice.outcome!=c::NativeOutcome::Cancelled)panel.notice="Cookie file was not selected. Enter an explicit local path.";
             }
@@ -209,7 +232,7 @@ ServerFacts DrawServer(ServerPanel& panel, ConnectionService& service, c::Presen
         if (external) presentation.Defer(*external, [&panel, i, sync](const c::SemanticRequest&) { panel.proxy = i; return sync(); });
     }
     if (panel.proxy) { field("proxy-host", "Proxy host", panel.proxy_host); field("proxy-port", "Proxy port", panel.proxy_port); }
-    valid = !panel.secure_store && std::filesystem::path(panel.credential.draft()).is_absolute() && ValidServerCandidate(panel.Candidate());
+    valid = !panel.secure_store && AbsoluteCookiePath(panel.credential.draft()) && ValidServerCandidate(panel.Candidate());
     if (!valid) { const char* message="Enter a valid endpoint, cookie reference and 64-digit genesis. Onion hosts require an explicit proxy."; ImGui::PushStyleColor(ImGuiCol_Text, theme.semantic.error); ImGui::TextWrapped("%s",message); ImGui::PopStyleColor(); presentation.Annotate("validation", "Connection validation",message,c::ax::SemanticRole::Alert); }
     if (service.Busy()) { ImGui::TextUnformatted("Testing connection…"); presentation.Annotate("testing", "Connection test", "Testing connection", c::ax::SemanticRole::Status, false, true, true); }
     if (const auto& tested = service.Tested()) {
@@ -234,7 +257,7 @@ ServerFacts DrawServer(ServerPanel& panel, ConnectionService& service, c::Presen
             const auto* action = std::get_if<c::Action>(&command); if (!action || !panel.dialog.open) return false;
             if (action->id == "cancel") return true;
             if (panel.source!=ServerSource::DirectRpc || panel.cookie_dialog || panel.secure_store || service.PrivacyLocked()
-                || !std::filesystem::path(panel.credential.draft()).is_absolute())return false;
+                || !AbsoluteCookiePath(panel.credential.draft()))return false;
             if (action->id == "test") return !service.Offline() && !service.Busy() && ValidServerCandidate(panel.Candidate()) && service.Draft() == panel.Candidate();
             return action->id == "apply" && service.CanApply() && service.Draft() == panel.Candidate();
         }
